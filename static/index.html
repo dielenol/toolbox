@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nukki Local</title>
-    <link rel="stylesheet" href="/static/styles.css?v=8" />
+    <link rel="stylesheet" href="/static/styles.css?v=9" />
   </head>
   <body>
     <header class="topbar">
@@ -30,7 +30,10 @@
     <div class="progress-overlay" id="progressOverlay" hidden role="status" aria-live="polite">
       <div class="progress-dialog">
         <div class="progress-copy">
-          <strong id="progressTitle">처리 중</strong>
+          <div class="progress-heading">
+            <span class="progress-spinner" aria-hidden="true"></span>
+            <strong id="progressTitle">처리 중</strong>
+          </div>
           <span id="progressDetail">이미지를 정리하고 있습니다.</span>
         </div>
         <div class="progress-track" aria-hidden="true">
@@ -234,6 +237,20 @@
           </label>
         </section>
 
+        <section class="control-group" aria-labelledby="convertSizeLabel">
+          <div class="group-head">
+            <h2 id="convertSizeLabel">출력 크기</h2>
+            <span id="convertSizeValue">원본</span>
+          </div>
+          <select id="convertMaxSize" aria-label="출력 최대 크기 선택">
+            <option value="0" selected>원본 유지</option>
+            <option value="128">최대 128px</option>
+            <option value="256">최대 256px</option>
+            <option value="512">최대 512px</option>
+          </select>
+          <p class="helper-text">긴 변 기준으로 줄여 저장합니다. 원본보다 작은 이미지는 억지로 키우지 않습니다.</p>
+        </section>
+
         <section class="control-group" id="icoSizeGroup" aria-labelledby="icoSizeLabel" hidden>
           <div class="group-head">
             <h2 id="icoSizeLabel">ICO 크기</h2>
@@ -311,6 +328,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=8" type="module"></script>
+    <script src="/static/app.js?v=9" type="module"></script>
   </body>
 </html>

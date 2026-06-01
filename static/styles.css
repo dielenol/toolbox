@@ -138,6 +138,27 @@ select {
   margin-bottom: 14px;
 }
 
+.progress-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.progress-spinner,
+.is-busy::before {
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 760ms linear infinite;
+  flex: 0 0 auto;
+}
+
+.progress-spinner {
+  color: var(--teal);
+}
+
 .progress-copy strong {
   font-size: 1rem;
 }
@@ -172,6 +193,12 @@ select {
 
   100% {
     transform: translateX(245%);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -484,6 +511,7 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-height: 46px;
   padding: 0 16px;
   border-radius: 8px;

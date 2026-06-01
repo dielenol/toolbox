@@ -53,6 +53,8 @@ const formatProfile = document.querySelector("#formatProfile");
 const convertQuality = document.querySelector("#convertQuality");
 const convertQualityValue = document.querySelector("#convertQualityValue");
 const convertQualityRow = document.querySelector("#convertQualityRow");
+const convertMaxSize = document.querySelector("#convertMaxSize");
+const convertSizeValue = document.querySelector("#convertSizeValue");
 const backgroundColor = document.querySelector("#backgroundColor");
 const backgroundColorRow = document.querySelector("#backgroundColorRow");
 const icoSizeGroup = document.querySelector("#icoSizeGroup");
@@ -259,6 +261,9 @@ function syncFloatingActions() {
   floatingWebpButton.disabled = webpDownloadButton.disabled;
   floatingConvertButton.disabled = convertButton.disabled;
   floatingConvertDownloadButton.disabled = isDisabledDownload(convertDownloadButton);
+  mirrorActionState(floatingProcessButton, processButton);
+  mirrorActionState(floatingWebpButton, webpDownloadButton);
+  mirrorActionState(floatingConvertButton, convertButton);
 }
 
 function isActionRowVisible(row) {
@@ -269,6 +274,12 @@ function isActionRowVisible(row) {
 
 function isDisabledDownload(anchor) {
   return anchor.classList.contains("disabled") || !anchor.hasAttribute("href");
+}
+
+function mirrorActionState(target, source) {
+  target.textContent = source.textContent;
+  target.classList.toggle("is-busy", source.classList.contains("is-busy"));
+  target.setAttribute("aria-busy", source.classList.contains("is-busy") ? "true" : "false");
 }
 
 function bindCutoutEvents() {
@@ -295,6 +306,7 @@ function bindConvertEvents() {
   bindFilePicker(convertFileInput, convertDropzone, setConvertFile);
   convertFormat.addEventListener("change", updateConvertControls);
   convertQuality.addEventListener("input", updateConvertControls);
+  convertMaxSize.addEventListener("change", updateConvertControls);
   document.querySelectorAll("input[name='icoSize']").forEach((input) => {
     input.addEventListener("change", updateConvertControls);
   });
@@ -419,6 +431,8 @@ async function processImage() {
 
   processButton.disabled = true;
   processButton.textContent = "처리 중";
+  processButton.classList.add("is-busy");
+  processButton.setAttribute("aria-busy", "true");
   stageTitle.textContent = "처리 중";
   resultMeta.textContent = "모델 실행";
   showProgress(
@@ -478,6 +492,8 @@ async function processImage() {
     hideProgress();
     processButton.disabled = false;
     processButton.textContent = "누끼 따기";
+    processButton.classList.remove("is-busy");
+    processButton.setAttribute("aria-busy", "false");
     syncFloatingActions();
   }
 }
@@ -498,6 +514,8 @@ async function downloadCutoutWebp() {
 
   webpDownloadButton.disabled = true;
   webpDownloadButton.textContent = "최적화 중";
+  webpDownloadButton.classList.add("is-busy");
+  webpDownloadButton.setAttribute("aria-busy", "true");
   resultMeta.textContent = "WebP 변환";
   showProgress("WebP 최적화 중", "누끼 결과를 화질 손실이 거의 없는 WebP로 준비하고 있습니다.");
   syncFloatingActions();
@@ -534,6 +552,8 @@ async function downloadCutoutWebp() {
     hideProgress();
     webpDownloadButton.disabled = false;
     webpDownloadButton.textContent = "WebP 저장";
+    webpDownloadButton.classList.remove("is-busy");
+    webpDownloadButton.setAttribute("aria-busy", "false");
     syncFloatingActions();
   }
 }
@@ -573,6 +593,8 @@ async function convertImage() {
 
   convertButton.disabled = true;
   convertButton.textContent = "변환 중";
+  convertButton.classList.add("is-busy");
+  convertButton.setAttribute("aria-busy", "true");
   convertStageTitle.textContent = "변환 중";
   convertResultMeta.textContent = convertFormat.value.toUpperCase();
   showProgress("파일 변환 중", `${convertFormat.value.toUpperCase()} 파일을 만들고 있습니다.`);
@@ -584,6 +606,7 @@ async function convertImage() {
   formData.append("background_color", backgroundColor.value);
   formData.append("quality", convertQuality.value);
   formData.append("ico_sizes", getSelectedIcoSizes().join(",") || "256");
+  formData.append("output_size", convertMaxSize.value);
 
   try {
     const response = await fetch("/api/convert", {
@@ -622,6 +645,8 @@ async function convertImage() {
     hideProgress();
     convertButton.disabled = false;
     convertButton.textContent = "변환하기";
+    convertButton.classList.remove("is-busy");
+    convertButton.setAttribute("aria-busy", "false");
     syncFloatingActions();
   }
 }
@@ -676,6 +701,7 @@ function updateConvertControls() {
   backgroundColorRow.classList.toggle("control-disabled", !backgroundEnabled);
   icoSizeGroup.hidden = !icoEnabled;
   convertQualityValue.textContent = qualityEnabled ? convertQuality.value : "무손실";
+  convertSizeValue.textContent = convertMaxSize.value === "0" ? "원본" : `${convertMaxSize.value}px`;
   updateIcoSizeLabel();
 }
 

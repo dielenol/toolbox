@@ -37,6 +37,7 @@ class ConvertOptions:
     quality: int = 95
     webp_lossless: bool = False
     ico_sizes: tuple[int, ...] = DEFAULT_ICO_SIZES
+    output_size: int | None = None
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,7 @@ def convert_image(contents: bytes, options: ConvertOptions) -> ConvertResult:
     started = time.perf_counter()
     output_format = _normalize_output_format(options.output_format)
     image = _load_image(contents)
+    image = _resize_to_fit(image, options.output_size)
     prepared = _prepare_for_format(image, output_format, options.background_color)
 
     buffer = BytesIO()
@@ -128,6 +130,19 @@ def _prepare_for_format(image: Image.Image, output_format: str, background_color
     if output_format in ("png", "webp", "tiff"):
         return image.convert("RGBA") if _has_alpha(image) else image.convert("RGB")
     return image
+
+
+def _resize_to_fit(image: Image.Image, output_size: int | None) -> Image.Image:
+    if not output_size:
+        return image
+
+    size = max(8, min(4096, int(output_size)))
+    if image.width <= size and image.height <= size:
+        return image
+
+    resized = image.copy()
+    resized.thumbnail((size, size), Image.Resampling.LANCZOS)
+    return resized
 
 
 def _save_kwargs(output_format: str, options: ConvertOptions) -> dict[str, object]:

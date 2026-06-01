@@ -172,6 +172,7 @@ async def convert_endpoint(
     quality: int = Form(95),
     webp_lossless: bool = Form(False),
     ico_sizes: str = Form("16,32,48,64,128,256"),
+    output_size: int = Form(0),
 ) -> Response:
     normalized_format = output_format.lower().strip().lstrip(".")
     if normalized_format == "jpeg":
@@ -190,6 +191,7 @@ async def convert_endpoint(
             quality=quality,
             webp_lossless=webp_lossless,
             ico_sizes=parse_ico_sizes(ico_sizes),
+            output_size=output_size if output_size > 0 else None,
         )
         result = await run_in_threadpool(convert_image, contents, options)
     except ConvertInvalidImageError as exc:
