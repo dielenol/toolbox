@@ -210,15 +210,14 @@ select {
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border: 2px solid var(--ink);
+  display: block;
+  width: 42px;
+  height: 42px;
+  border: 0;
   border-radius: 8px;
-  background:
-    linear-gradient(135deg, transparent 0 47%, var(--ink) 48% 52%, transparent 53%),
-    linear-gradient(45deg, var(--sage) 0 50%, #ffffff 50%);
-  box-shadow: 5px 5px 0 var(--gold);
+  background: transparent;
   flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .brand h1,
