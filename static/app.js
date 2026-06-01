@@ -155,6 +155,8 @@ let resultBlob = null;
 let convertFile = null;
 let convertOriginalUrl = null;
 let convertResultUrl = null;
+let convertResultBlob = null;
+let convertResultFormat = null;
 let pageDragDepth = 0;
 
 init();
@@ -285,6 +287,7 @@ function bindCutoutEvents() {
   }
 
   processButton.addEventListener("click", processImage);
+  downloadButton.addEventListener("click", saveCutoutPng);
   webpDownloadButton.addEventListener("click", downloadCutoutWebp);
 }
 
@@ -296,6 +299,7 @@ function bindConvertEvents() {
     input.addEventListener("change", updateConvertControls);
   });
   convertButton.addEventListener("click", convertImage);
+  convertDownloadButton.addEventListener("click", saveConvertedFile);
 }
 
 function bindFilePicker(input, zone, onFile) {
@@ -481,6 +485,17 @@ async function processImage() {
 async function downloadCutoutWebp() {
   if (!resultBlob || !selectedFile) return;
 
+  const filename = buildCutoutWebpName(selectedFile.name);
+  let saveTarget;
+  try {
+    saveTarget = await prepareSaveTarget(filename, getSaveFileTypes("webp"));
+    if (saveTarget.cancelled) return;
+  } catch (error) {
+    resultMeta.textContent = "저장 오류";
+    stageMeta.textContent = error.message;
+    return;
+  }
+
   webpDownloadButton.disabled = true;
   webpDownloadButton.textContent = "최적화 중";
   resultMeta.textContent = "WebP 변환";
@@ -506,10 +521,12 @@ async function downloadCutoutWebp() {
 
     const blob = await response.blob();
     const elapsed = response.headers.get("X-Process-Time-Ms");
-    const webpUrl = URL.createObjectURL(blob);
-    triggerDownload(webpUrl, buildCutoutWebpName(selectedFile.name));
-    window.setTimeout(() => URL.revokeObjectURL(webpUrl), 1000);
-    resultMeta.textContent = elapsed ? `WebP ${Number(elapsed).toLocaleString()} ms` : "WebP 완료";
+    const saved = await writeBlobToSaveTarget(blob, saveTarget, filename);
+    resultMeta.textContent = saved
+      ? elapsed
+        ? `WebP ${Number(elapsed).toLocaleString()} ms`
+        : "WebP 완료"
+      : "저장 취소";
   } catch (error) {
     resultMeta.textContent = "WebP 오류";
     stageMeta.textContent = error.message;
@@ -518,6 +535,20 @@ async function downloadCutoutWebp() {
     webpDownloadButton.disabled = false;
     webpDownloadButton.textContent = "WebP 저장";
     syncFloatingActions();
+  }
+}
+
+async function saveCutoutPng(event) {
+  event.preventDefault();
+  if (!resultBlob || !selectedFile) return;
+
+  const filename = buildCutoutName(selectedFile.name);
+  try {
+    const saved = await saveBlobWithPicker(resultBlob, filename, getSaveFileTypes("png"));
+    resultMeta.textContent = saved ? "PNG 저장 완료" : "저장 취소";
+  } catch (error) {
+    resultMeta.textContent = "PNG 저장 오류";
+    stageMeta.textContent = error.message;
   }
 }
 
@@ -572,6 +603,8 @@ async function convertImage() {
     const outputFormat = response.headers.get("X-Output-Format") || convertFormat.value;
 
     clearConvertResult();
+    convertResultBlob = blob;
+    convertResultFormat = outputFormat;
     convertResultUrl = URL.createObjectURL(blob);
     loadPreview(convertResultPreview, convertResultUrl, convertResultSize, width, height);
     convertDownloadButton.href = convertResultUrl;
@@ -590,6 +623,21 @@ async function convertImage() {
     convertButton.disabled = false;
     convertButton.textContent = "변환하기";
     syncFloatingActions();
+  }
+}
+
+async function saveConvertedFile(event) {
+  event.preventDefault();
+  if (!convertResultBlob || !convertFile) return;
+
+  const outputFormat = convertResultFormat || convertFormat.value;
+  const filename = buildConvertedName(convertFile.name, outputFormat);
+  try {
+    const saved = await saveBlobWithPicker(convertResultBlob, filename, getSaveFileTypes(outputFormat));
+    convertResultMeta.textContent = saved ? "저장 완료" : "저장 취소";
+  } catch (error) {
+    convertResultMeta.textContent = "저장 오류";
+    convertStageMeta.textContent = error.message;
   }
 }
 
@@ -665,6 +713,8 @@ function clearResult() {
 function clearConvertResult() {
   if (convertResultUrl) URL.revokeObjectURL(convertResultUrl);
   convertResultUrl = null;
+  convertResultBlob = null;
+  convertResultFormat = null;
   convertResultPreview.removeAttribute("src");
   convertResultPreview.closest(".image-frame").classList.remove("has-image");
   convertDownloadButton.removeAttribute("href");
@@ -741,6 +791,101 @@ function buildConvertedName(name, format) {
   const stem = name.replace(/\.[^.]+$/, "") || "converted";
   const extension = format === "jpeg" ? "jpg" : format;
   return `${stem}.${extension}`;
+}
+
+async function saveBlobWithPicker(blob, filename, types) {
+  const saveTarget = await prepareSaveTarget(filename, types);
+  if (saveTarget.cancelled) return false;
+  return writeBlobToSaveTarget(blob, saveTarget, filename);
+}
+
+async function prepareSaveTarget(filename, types) {
+  if (!("showSaveFilePicker" in window)) {
+    return { kind: "server-dialog" };
+  }
+
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: filename,
+      types,
+      excludeAcceptAllOption: false,
+    });
+    return { kind: "picker", handle };
+  } catch (error) {
+    if (error.name === "AbortError") return { kind: "cancelled", cancelled: true };
+    console.warn("브라우저 저장 대화상자를 열 수 없어 로컬 저장 대화상자로 대체합니다.", error);
+    return { kind: "server-dialog" };
+  }
+}
+
+async function writeBlobToSaveTarget(blob, saveTarget, filename) {
+  if (saveTarget.kind === "server-dialog") {
+    try {
+      return await saveBlobWithServerDialog(blob, filename);
+    } catch (error) {
+      console.warn("로컬 저장 대화상자를 열 수 없어 브라우저 다운로드로 대체합니다.", error);
+    }
+  }
+
+  if (saveTarget.kind !== "picker") {
+    const url = URL.createObjectURL(blob);
+    triggerDownload(url, filename);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+
+  const writable = await saveTarget.handle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+  return true;
+}
+
+async function saveBlobWithServerDialog(blob, filename) {
+  const formData = new FormData();
+  formData.append("file", blob, filename);
+  formData.append("suggested_name", filename);
+  formData.append("output_format", normalizeOutputFormat(filename.split(".").pop()));
+
+  const response = await fetch("/api/save", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+  return Boolean(payload.saved);
+}
+
+function getSaveFileTypes(format) {
+  const normalizedFormat = normalizeOutputFormat(format);
+  const profiles = {
+    png: { description: "PNG 이미지", mime: "image/png", extensions: [".png"] },
+    jpg: { description: "JPG 이미지", mime: "image/jpeg", extensions: [".jpg", ".jpeg"] },
+    webp: { description: "WebP 이미지", mime: "image/webp", extensions: [".webp"] },
+    bmp: { description: "BMP 이미지", mime: "image/bmp", extensions: [".bmp"] },
+    tiff: { description: "TIFF 이미지", mime: "image/tiff", extensions: [".tif", ".tiff"] },
+    ico: { description: "ICO 아이콘", mime: "image/x-icon", extensions: [".ico"] },
+  };
+  const profile = profiles[normalizedFormat] ?? profiles.png;
+  return [
+    {
+      description: profile.description,
+      accept: {
+        [profile.mime]: profile.extensions,
+      },
+    },
+  ];
+}
+
+function normalizeOutputFormat(format) {
+  const normalized = String(format || "png").toLowerCase();
+  if (normalized === "jpeg") return "jpg";
+  if (normalized === "tif") return "tiff";
+  return normalized;
 }
 
 function triggerDownload(url, filename) {

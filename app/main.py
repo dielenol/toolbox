@@ -17,6 +17,7 @@ from app.converter import (
     convert_image,
     parse_ico_sizes,
 )
+from app.local_save import save_file_with_dialog
 from app.remover import (
     DEFAULT_MODEL,
     SUPPORTED_MODELS,
@@ -140,6 +141,27 @@ async def remove_endpoint(
             "X-Process-Time-Ms": str(result.elapsed_ms),
         },
     )
+
+
+@app.post("/api/save")
+async def save_endpoint(
+    file: UploadFile = File(...),
+    suggested_name: str = Form("download.png"),
+    output_format: str = Form("png"),
+) -> dict[str, object]:
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+
+    try:
+        saved_path = save_file_with_dialog(contents, suggested_name, output_format)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if saved_path is None:
+        return {"saved": False}
+
+    return {"saved": True, "path": str(saved_path)}
 
 
 @app.post("/api/convert")
