@@ -7,7 +7,7 @@ from io import BytesIO
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from app.remover import MAX_PIXELS
+from app.settings import MAX_PIXELS
 
 
 SUPPORTED_OUTPUT_FORMATS = ("png", "jpg", "webp", "bmp", "tiff", "ico")
@@ -28,6 +28,7 @@ PIL_FORMATS = {
     "ico": "ICO",
 }
 DEFAULT_ICO_SIZES = (16, 32, 48, 64, 128, 256)
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,10 @@ def convert_image(contents: bytes, options: ConvertOptions) -> ConvertResult:
 
     buffer = BytesIO()
     save_kwargs = _save_kwargs(output_format, options)
-    prepared.save(buffer, format=PIL_FORMATS[output_format], **save_kwargs)
+    try:
+        prepared.save(buffer, format=PIL_FORMATS[output_format], **save_kwargs)
+    except OSError as exc:
+        raise InvalidImageError("선택한 형식으로 이미지를 저장할 수 없습니다.") from exc
 
     return ConvertResult(
         data=buffer.getvalue(),
@@ -110,15 +114,20 @@ def _normalize_output_format(output_format: str) -> str:
 def _load_image(contents: bytes) -> Image.Image:
     try:
         image = Image.open(BytesIO(contents))
+        pixel_count = image.width * image.height
+        if pixel_count > MAX_PIXELS:
+            megapixels = MAX_PIXELS / 1_000_000
+            raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.")
         image.load()
+    except ImageTooLargeError:
+        raise
+    except Image.DecompressionBombError as exc:
+        megapixels = MAX_PIXELS / 1_000_000
+        raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.") from exc
     except (UnidentifiedImageError, OSError) as exc:
         raise InvalidImageError("이미지 파일을 읽을 수 없습니다.") from exc
 
     image = ImageOps.exif_transpose(image)
-    pixel_count = image.width * image.height
-    if pixel_count > MAX_PIXELS:
-        megapixels = MAX_PIXELS / 1_000_000
-        raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.")
     return image
 
 
@@ -136,7 +145,9 @@ def _resize_to_fit(image: Image.Image, output_size: int | None) -> Image.Image:
     if not output_size:
         return image
 
-    size = max(8, min(4096, int(output_size)))
+    size = int(output_size)
+    if size < 8 or size > 4096:
+        raise ValueError("출력 크기는 8px부터 4096px 사이여야 합니다.")
     if image.width <= size and image.height <= size:
         return image
 

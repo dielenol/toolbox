@@ -1,13 +1,22 @@
 from __future__ import annotations
 
-import os
 import time
+import warnings
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps, UnidentifiedImageError
 from rembg import new_session, remove
+
+from app.settings import (
+    BIREFNET_INPUT_SIZE,
+    BIREFNET_REPO,
+    BIREFNET_REVISION,
+    DEFAULT_MODEL_NAME,
+    MAX_PIXELS,
+    TORCH_THREADS,
+)
 
 
 REMBG_MODELS = (
@@ -18,11 +27,16 @@ REMBG_MODELS = (
     "isnet-anime",
 )
 BIREFNET_MODEL = "birefnet-hq"
-BIREFNET_REPO = os.getenv("NUKKI_BIREFNET_REPO", "ZhengPeng7/BiRefNet")
-BIREFNET_INPUT_SIZE = int(os.getenv("NUKKI_BIREFNET_SIZE", "1024"))
 SUPPORTED_MODELS = (BIREFNET_MODEL, *REMBG_MODELS)
-DEFAULT_MODEL = os.getenv("NUKKI_MODEL", BIREFNET_MODEL)
-MAX_PIXELS = int(os.getenv("NUKKI_MAX_PIXELS", "80000000"))
+DEFAULT_MODEL = DEFAULT_MODEL_NAME if DEFAULT_MODEL_NAME in SUPPORTED_MODELS else BIREFNET_MODEL
+if DEFAULT_MODEL_NAME not in SUPPORTED_MODELS:
+    warnings.warn(
+        f"Unsupported default model {DEFAULT_MODEL_NAME!r}. Falling back to {BIREFNET_MODEL!r}.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
 
 
 @dataclass(frozen=True)
@@ -133,14 +147,14 @@ def _get_birefnet_runtime():
             "BiRefNet HQ를 사용하려면 torch, torchvision, transformers, timm이 필요합니다."
         ) from exc
 
-    thread_count = os.getenv("NUKKI_TORCH_THREADS")
-    if thread_count:
-        torch.set_num_threads(max(1, int(thread_count)))
+    if TORCH_THREADS:
+        torch.set_num_threads(TORCH_THREADS)
     torch.set_float32_matmul_precision("high")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = AutoModelForImageSegmentation.from_pretrained(
         BIREFNET_REPO,
+        revision=BIREFNET_REVISION,
         trust_remote_code=True,
     )
     model.to(device)
@@ -170,15 +184,20 @@ def _remove_with_birefnet(model_input: Image.Image, size: tuple[int, int]) -> Im
 def _load_image(contents: bytes) -> Image.Image:
     try:
         image = Image.open(BytesIO(contents))
+        pixel_count = image.width * image.height
+        if pixel_count > MAX_PIXELS:
+            megapixels = MAX_PIXELS / 1_000_000
+            raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.")
         image.load()
+    except ImageTooLargeError:
+        raise
+    except Image.DecompressionBombError as exc:
+        megapixels = MAX_PIXELS / 1_000_000
+        raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.") from exc
     except (UnidentifiedImageError, OSError) as exc:
         raise InvalidImageError("이미지 파일을 읽을 수 없습니다.") from exc
 
     image = ImageOps.exif_transpose(image)
-    pixel_count = image.width * image.height
-    if pixel_count > MAX_PIXELS:
-        megapixels = MAX_PIXELS / 1_000_000
-        raise ImageTooLargeError(f"이미지는 최대 {megapixels:.0f}MP까지 처리할 수 있습니다.")
     return image
 
 

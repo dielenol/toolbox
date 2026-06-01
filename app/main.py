@@ -27,12 +27,13 @@ from app.remover import (
     UnsupportedModelError,
     remove_background,
 )
+from app.settings import MAX_UPLOAD_BYTES
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="Nukki Local", version="0.1.0")
+app = FastAPI(title="Toolbox", version="0.1.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -104,9 +105,7 @@ async def remove_endpoint(
     if model_name not in SUPPORTED_MODELS:
         raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
 
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+    contents = await _read_upload(file)
 
     options = RemoveOptions(
         model_name=model_name,
@@ -149,19 +148,22 @@ async def save_endpoint(
     suggested_name: str = Form("download.png"),
     output_format: str = Form("png"),
 ) -> dict[str, object]:
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+    contents = await _read_upload(file)
 
     try:
-        saved_path = save_file_with_dialog(contents, suggested_name, output_format)
+        saved_path = await run_in_threadpool(
+            save_file_with_dialog,
+            contents,
+            suggested_name,
+            output_format,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     if saved_path is None:
         return {"saved": False}
 
-    return {"saved": True, "path": str(saved_path)}
+    return {"saved": True}
 
 
 @app.post("/api/convert")
@@ -180,9 +182,7 @@ async def convert_endpoint(
     if normalized_format not in SUPPORTED_OUTPUT_FORMATS:
         raise HTTPException(status_code=400, detail="지원하지 않는 출력 형식입니다.")
 
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+    contents = await _read_upload(file)
 
     try:
         options = ConvertOptions(
@@ -254,3 +254,26 @@ def _content_disposition(filename: str) -> str:
     ascii_name = f"{ascii_stem}{suffix}" if ascii_stem else f"download{suffix}"
     utf8_name = quote(filename, safe="")
     return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"파일은 최대 {_format_bytes(MAX_UPLOAD_BYTES)}까지 업로드할 수 있습니다.",
+        )
+    if not contents:
+        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+    return contents
+
+
+def _format_bytes(value: int) -> str:
+    units = ("B", "KB", "MB", "GB")
+    size = float(value)
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    precision = 0 if unit_index == 0 else 1
+    return f"{size:.{precision}f} {units[unit_index]}"
