@@ -4,13 +4,21 @@ const tabButtons = document.querySelectorAll("[data-view-target]");
 const workspaces = document.querySelectorAll(".workspace-view");
 const pageDropOverlay = document.querySelector("#pageDropOverlay");
 const pageDropText = document.querySelector("#pageDropText");
+const progressOverlay = document.querySelector("#progressOverlay");
+const progressTitle = document.querySelector("#progressTitle");
+const progressDetail = document.querySelector("#progressDetail");
 
 const fileInput = document.querySelector("#fileInput");
 const dropzone = document.querySelector("#dropzone");
 const fileMeta = document.querySelector("#fileMeta");
+const cutoutActionRow = document.querySelector("#cutoutActionRow");
 const processButton = document.querySelector("#processButton");
 const downloadButton = document.querySelector("#downloadButton");
 const webpDownloadButton = document.querySelector("#webpDownloadButton");
+const cutoutFloatingActions = document.querySelector("#cutoutFloatingActions");
+const floatingProcessButton = document.querySelector("#floatingProcessButton");
+const floatingDownloadButton = document.querySelector("#floatingDownloadButton");
+const floatingWebpButton = document.querySelector("#floatingWebpButton");
 const originalPreview = document.querySelector("#originalPreview");
 const resultPreview = document.querySelector("#resultPreview");
 const originalSize = document.querySelector("#originalSize");
@@ -49,8 +57,12 @@ const backgroundColor = document.querySelector("#backgroundColor");
 const backgroundColorRow = document.querySelector("#backgroundColorRow");
 const icoSizeGroup = document.querySelector("#icoSizeGroup");
 const icoSizeValue = document.querySelector("#icoSizeValue");
+const convertActionRow = document.querySelector("#convertActionRow");
 const convertButton = document.querySelector("#convertButton");
 const convertDownloadButton = document.querySelector("#convertDownloadButton");
+const convertFloatingActions = document.querySelector("#convertFloatingActions");
+const floatingConvertButton = document.querySelector("#floatingConvertButton");
+const floatingConvertDownloadButton = document.querySelector("#floatingConvertDownloadButton");
 const convertOriginalPreview = document.querySelector("#convertOriginalPreview");
 const convertResultPreview = document.querySelector("#convertResultPreview");
 const convertOriginalSize = document.querySelector("#convertOriginalSize");
@@ -150,11 +162,13 @@ init();
 function init() {
   bindTabs();
   bindPageDrop();
+  bindFloatingActions();
   bindCutoutEvents();
   bindConvertEvents();
   applyPreset("ultra");
   updateConvertControls();
   checkApi();
+  syncFloatingActions();
 }
 
 function bindPageDrop() {
@@ -195,6 +209,23 @@ function bindTabs() {
   });
 }
 
+function bindFloatingActions() {
+  floatingProcessButton.addEventListener("click", () => processButton.click());
+  floatingDownloadButton.addEventListener("click", () => downloadButton.click());
+  floatingWebpButton.addEventListener("click", () => webpDownloadButton.click());
+  floatingConvertButton.addEventListener("click", () => convertButton.click());
+  floatingConvertDownloadButton.addEventListener("click", () => convertDownloadButton.click());
+
+  const observer = new IntersectionObserver(() => syncFloatingActions(), {
+    threshold: 0.01,
+  });
+  observer.observe(cutoutActionRow);
+  observer.observe(convertActionRow);
+
+  window.addEventListener("scroll", () => requestAnimationFrame(syncFloatingActions), { passive: true });
+  window.addEventListener("resize", () => requestAnimationFrame(syncFloatingActions));
+}
+
 function switchView(target) {
   tabButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.viewTarget === target);
@@ -202,11 +233,40 @@ function switchView(target) {
   workspaces.forEach((workspace) => {
     workspace.hidden = workspace.dataset.view !== target;
   });
+  requestAnimationFrame(syncFloatingActions);
 }
 
 function getActiveView() {
   const activeButton = document.querySelector(".tab-button.active");
   return activeButton?.dataset.viewTarget || "cutout";
+}
+
+function syncFloatingActions() {
+  const activeView = getActiveView();
+  const cutoutHasWork = Boolean(selectedFile || resultBlob);
+  const convertHasWork = Boolean(convertFile || convertResultUrl);
+  const cutoutShouldFloat = activeView === "cutout" && cutoutHasWork && !isActionRowVisible(cutoutActionRow);
+  const convertShouldFloat = activeView === "convert" && convertHasWork && !isActionRowVisible(convertActionRow);
+
+  cutoutFloatingActions.hidden = !cutoutShouldFloat;
+  convertFloatingActions.hidden = !convertShouldFloat;
+  document.body.classList.toggle("has-floating-actions", cutoutShouldFloat || convertShouldFloat);
+
+  floatingProcessButton.disabled = processButton.disabled;
+  floatingDownloadButton.disabled = isDisabledDownload(downloadButton);
+  floatingWebpButton.disabled = webpDownloadButton.disabled;
+  floatingConvertButton.disabled = convertButton.disabled;
+  floatingConvertDownloadButton.disabled = isDisabledDownload(convertDownloadButton);
+}
+
+function isActionRowVisible(row) {
+  if (!row || row.offsetParent === null) return false;
+  const rect = row.getBoundingClientRect();
+  return rect.bottom > 0 && rect.top < window.innerHeight;
+}
+
+function isDisabledDownload(anchor) {
+  return anchor.classList.contains("disabled") || !anchor.hasAttribute("href");
 }
 
 function bindCutoutEvents() {
@@ -297,6 +357,16 @@ function hidePageDropOverlay() {
   pageDropOverlay.classList.remove("visible");
 }
 
+function showProgress(title, detail) {
+  progressTitle.textContent = title;
+  progressDetail.textContent = detail;
+  progressOverlay.hidden = false;
+}
+
+function hideProgress() {
+  progressOverlay.hidden = true;
+}
+
 function hasDraggedFiles(event) {
   return Array.from(event.dataTransfer?.types || []).includes("Files");
 }
@@ -337,6 +407,7 @@ function setFile(file) {
   if (originalUrl) URL.revokeObjectURL(originalUrl);
   originalUrl = URL.createObjectURL(file);
   loadPreview(originalPreview, originalUrl, originalSize);
+  syncFloatingActions();
 }
 
 async function processImage() {
@@ -346,6 +417,13 @@ async function processImage() {
   processButton.textContent = "처리 중";
   stageTitle.textContent = "처리 중";
   resultMeta.textContent = "모델 실행";
+  showProgress(
+    "누끼 따는 중",
+    modelSelect.value === "birefnet-hq"
+      ? "고품질 모델로 가장자리를 계산하고 있습니다. 큰 이미지는 조금 걸릴 수 있어요."
+      : "배경 마스크를 만들고 가장자리를 정리하고 있습니다.",
+  );
+  syncFloatingActions();
 
   const formData = new FormData();
   formData.append("file", selectedFile);
@@ -393,8 +471,10 @@ async function processImage() {
     resultMeta.textContent = "오류";
     stageMeta.textContent = error.message;
   } finally {
+    hideProgress();
     processButton.disabled = false;
     processButton.textContent = "누끼 따기";
+    syncFloatingActions();
   }
 }
 
@@ -404,6 +484,8 @@ async function downloadCutoutWebp() {
   webpDownloadButton.disabled = true;
   webpDownloadButton.textContent = "최적화 중";
   resultMeta.textContent = "WebP 변환";
+  showProgress("WebP 최적화 중", "누끼 결과를 화질 손실이 거의 없는 WebP로 준비하고 있습니다.");
+  syncFloatingActions();
 
   const formData = new FormData();
   formData.append("file", resultBlob, buildCutoutName(selectedFile.name));
@@ -432,8 +514,10 @@ async function downloadCutoutWebp() {
     resultMeta.textContent = "WebP 오류";
     stageMeta.textContent = error.message;
   } finally {
+    hideProgress();
     webpDownloadButton.disabled = false;
     webpDownloadButton.textContent = "WebP 저장";
+    syncFloatingActions();
   }
 }
 
@@ -450,6 +534,7 @@ function setConvertFile(file) {
   if (convertOriginalUrl) URL.revokeObjectURL(convertOriginalUrl);
   convertOriginalUrl = URL.createObjectURL(file);
   loadPreview(convertOriginalPreview, convertOriginalUrl, convertOriginalSize);
+  syncFloatingActions();
 }
 
 async function convertImage() {
@@ -459,6 +544,8 @@ async function convertImage() {
   convertButton.textContent = "변환 중";
   convertStageTitle.textContent = "변환 중";
   convertResultMeta.textContent = convertFormat.value.toUpperCase();
+  showProgress("파일 변환 중", `${convertFormat.value.toUpperCase()} 파일을 만들고 있습니다.`);
+  syncFloatingActions();
 
   const formData = new FormData();
   formData.append("file", convertFile);
@@ -499,8 +586,10 @@ async function convertImage() {
     convertResultMeta.textContent = "오류";
     convertStageMeta.textContent = error.message;
   } finally {
+    hideProgress();
     convertButton.disabled = false;
     convertButton.textContent = "변환하기";
+    syncFloatingActions();
   }
 }
 

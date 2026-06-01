@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nukki Local</title>
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=7" />
   </head>
   <body>
     <header class="topbar">
@@ -25,6 +25,18 @@
 
     <div class="page-drop-overlay" id="pageDropOverlay" aria-hidden="true">
       <span id="pageDropText">이미지 놓기</span>
+    </div>
+
+    <div class="progress-overlay" id="progressOverlay" hidden role="status" aria-live="polite">
+      <div class="progress-dialog">
+        <div class="progress-copy">
+          <strong id="progressTitle">처리 중</strong>
+          <span id="progressDetail">이미지를 정리하고 있습니다.</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <span class="progress-bar"></span>
+        </div>
+      </div>
     </div>
 
     <main class="workspace workspace-view" id="cutoutWorkspace" data-view="cutout">
@@ -138,7 +150,7 @@
           </label>
         </section>
 
-        <div class="action-row">
+        <div class="action-row" id="cutoutActionRow">
           <button type="button" class="primary-button" id="processButton" disabled>누끼 따기</button>
           <a class="ghost-button disabled" id="downloadButton" download>PNG 저장</a>
           <button type="button" class="ghost-button" id="webpDownloadButton" disabled>WebP 저장</button>
@@ -237,7 +249,7 @@
           </div>
         </section>
 
-        <div class="action-row">
+        <div class="action-row" id="convertActionRow">
           <button type="button" class="primary-button" id="convertButton" disabled>변환하기</button>
           <a class="ghost-button disabled" id="convertDownloadButton" download>파일 저장</a>
         </div>
@@ -278,6 +290,27 @@
       </section>
     </main>
 
-    <script src="/static/app.js?v=6" type="module"></script>
+    <div class="floating-actions" id="cutoutFloatingActions" hidden>
+      <div class="floating-actions__content">
+        <span>누끼 작업</span>
+        <div class="floating-actions__buttons">
+          <button type="button" class="primary-button" id="floatingProcessButton" disabled>누끼 따기</button>
+          <button type="button" class="ghost-button" id="floatingDownloadButton" disabled>PNG 저장</button>
+          <button type="button" class="ghost-button" id="floatingWebpButton" disabled>WebP 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="floating-actions" id="convertFloatingActions" hidden>
+      <div class="floating-actions__content">
+        <span>파일 변환</span>
+        <div class="floating-actions__buttons">
+          <button type="button" class="primary-button" id="floatingConvertButton" disabled>변환하기</button>
+          <button type="button" class="ghost-button" id="floatingConvertDownloadButton" disabled>파일 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/app.js?v=7" type="module"></script>
   </body>
 </html>
