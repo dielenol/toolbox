@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nukki Local</title>
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Nukki Local</h1>
+          <p>로컬 이미지 작업대</p>
+        </div>
+      </div>
+      <div class="status-pill" id="apiStatus">확인 중</div>
+    </header>
+
+    <nav class="app-tabs" aria-label="작업 선택">
+      <button type="button" class="tab-button active" data-view-target="cutout">누끼</button>
+      <button type="button" class="tab-button" data-view-target="convert">파일 변환</button>
+    </nav>
+
+    <div class="page-drop-overlay" id="pageDropOverlay" aria-hidden="true">
+      <span id="pageDropText">이미지 놓기</span>
+    </div>
+
+    <main class="workspace workspace-view" id="cutoutWorkspace" data-view="cutout">
+      <aside class="control-panel" aria-label="누끼 옵션">
+        <label class="dropzone" id="dropzone">
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff" />
+          <span class="drop-title">이미지 선택</span>
+          <span class="drop-meta" id="fileMeta">PNG, JPG, WebP, BMP, TIFF</span>
+        </label>
+
+        <section class="control-group" aria-labelledby="modelLabel">
+          <div class="group-head">
+            <h2 id="modelLabel">모델</h2>
+            <span id="modelProfile">최고 품질</span>
+          </div>
+          <select id="modelSelect" aria-label="모델 선택">
+            <option value="birefnet-hq" selected>BiRefNet HQ</option>
+            <option value="isnet-general-use">ISNet General</option>
+            <option value="u2net">U2-Net</option>
+            <option value="u2netp">U2-Netp</option>
+            <option value="u2net_human_seg">Human Segmentation</option>
+            <option value="isnet-anime">ISNet Anime</option>
+          </select>
+          <p class="helper-text" id="modelHelp">
+            가장 정밀한 모델입니다. 머리카락, 제품 윤곽, 복잡한 배경에 강하지만 처리 시간이 더 깁니다.
+          </p>
+        </section>
+
+        <section class="control-group" aria-labelledby="qualityLabel">
+          <div class="group-head">
+            <h2 id="qualityLabel">품질</h2>
+            <span id="qualityMode">Ultra</span>
+          </div>
+          <div class="segmented" role="group" aria-label="품질 프리셋">
+            <button type="button" class="segment active" data-preset="ultra">Ultra</button>
+            <button type="button" class="segment" data-preset="studio">Studio</button>
+            <button type="button" class="segment" data-preset="balanced">Balanced</button>
+            <button type="button" class="segment" data-preset="fast">Fast</button>
+          </div>
+          <p class="helper-text" id="presetHelp">
+            가장 정밀하게 따는 설정입니다. 느리지만 복잡한 경계에 유리합니다.
+          </p>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>머리카락/반투명 보정</strong>
+              <small>얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.</small>
+            </span>
+            <input id="alphaMatting" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>마스크 정리</strong>
+              <small>배경에 남은 점이나 작은 구멍을 정리합니다. 얇은 선이 사라지면 꺼보세요.</small>
+            </span>
+            <input id="postProcess" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>테두리 색 번짐 제거</strong>
+              <small>흰 배경, 초록 배경 같은 기존 배경색이 가장자리에 묻는 현상을 줄입니다.</small>
+            </span>
+            <input id="foregroundRefine" type="checkbox" checked />
+          </label>
+        </section>
+
+        <section class="control-group" aria-labelledby="edgeLabel">
+          <div class="group-head">
+            <h2 id="edgeLabel">엣지</h2>
+            <span id="edgeValue">0.1px</span>
+          </div>
+          <p class="helper-text">
+            결과물 가장자리 모양을 다듬습니다. 처음에는 기본값으로 두고, 테두리가 거칠 때만 조금씩 조정하세요.
+          </p>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>부드럽게</strong>
+              <small id="featherHelp">낮음: 경계를 선명하게 유지합니다.</small>
+            </span>
+            <input id="edgeFeather" type="range" min="0" max="2" step="0.1" value="0.1" />
+          </label>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>안쪽으로 줄이기</strong>
+              <small id="erodeHelp">약함: 원래 윤곽을 거의 그대로 둡니다.</small>
+            </span>
+            <input id="erodeSize" type="range" min="0" max="20" step="1" value="4" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-labelledby="thresholdLabel">
+          <div class="group-head">
+            <h2 id="thresholdLabel">임계값</h2>
+            <span id="thresholdValue">240 / 10</span>
+          </div>
+          <p class="helper-text">
+            Alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 건드리지 않아도 됩니다.
+          </p>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>피사체 확신</strong>
+              <small id="foregroundHelp">높음: 확실한 피사체만 또렷하게 잡습니다.</small>
+            </span>
+            <input id="foregroundThreshold" type="range" min="1" max="255" step="1" value="240" />
+          </label>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>배경 확신</strong>
+              <small id="backgroundHelp">낮음: 배경으로 확실한 부분만 제거합니다.</small>
+            </span>
+            <input id="backgroundThreshold" type="range" min="0" max="254" step="1" value="10" />
+          </label>
+        </section>
+
+        <div class="action-row">
+          <button type="button" class="primary-button" id="processButton" disabled>누끼 따기</button>
+          <a class="ghost-button disabled" id="downloadButton" download>PNG 저장</a>
+          <button type="button" class="ghost-button" id="webpDownloadButton" disabled>WebP 저장</button>
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="누끼 미리보기">
+        <div class="stage-toolbar">
+          <div>
+            <h2 id="stageTitle">작업 대기</h2>
+            <p id="stageMeta">이미지를 선택하면 원본과 결과가 표시됩니다.</p>
+          </div>
+          <div class="result-meta" id="resultMeta">-</div>
+        </div>
+
+        <div class="preview-grid">
+          <article class="preview-pane">
+            <header>
+              <h3>원본</h3>
+              <span id="originalSize">-</span>
+            </header>
+            <div class="image-frame">
+              <img id="originalPreview" alt="원본 미리보기" />
+              <span class="empty-state">Original</span>
+            </div>
+          </article>
+
+          <article class="preview-pane">
+            <header>
+              <h3>결과</h3>
+              <span id="resultSize">-</span>
+            </header>
+            <div class="image-frame checkerboard">
+              <img id="resultPreview" alt="배경 제거 결과" />
+              <span class="empty-state">Transparent PNG</span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <main class="workspace workspace-view" id="convertWorkspace" data-view="convert" hidden>
+      <aside class="control-panel" aria-label="변환 옵션">
+        <label class="dropzone" id="convertDropzone">
+          <input
+            id="convertFileInput"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff,image/x-icon,image/vnd.microsoft.icon,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.ico"
+          />
+          <span class="drop-title">파일 선택</span>
+          <span class="drop-meta" id="convertFileMeta">PNG, JPG, WebP, BMP, TIFF, ICO</span>
+        </label>
+
+        <section class="control-group" aria-labelledby="formatLabel">
+          <div class="group-head">
+            <h2 id="formatLabel">출력 형식</h2>
+            <span id="formatProfile">투명 배경 보존</span>
+          </div>
+          <select id="convertFormat" aria-label="출력 형식 선택">
+            <option value="png" selected>PNG</option>
+            <option value="jpg">JPG</option>
+            <option value="webp">WebP</option>
+            <option value="bmp">BMP</option>
+            <option value="tiff">TIFF</option>
+            <option value="ico">ICO</option>
+          </select>
+        </section>
+
+        <section class="control-group" aria-labelledby="convertQualityLabel">
+          <div class="group-head">
+            <h2 id="convertQualityLabel">저장 옵션</h2>
+            <span id="convertQualityValue">95</span>
+          </div>
+          <label class="range-row" id="convertQualityRow">
+            <span>Quality</span>
+            <input id="convertQuality" type="range" min="1" max="100" step="1" value="95" />
+          </label>
+          <label class="color-row" id="backgroundColorRow">
+            <span>배경색</span>
+            <input id="backgroundColor" type="color" value="#ffffff" />
+          </label>
+        </section>
+
+        <section class="control-group" id="icoSizeGroup" aria-labelledby="icoSizeLabel" hidden>
+          <div class="group-head">
+            <h2 id="icoSizeLabel">ICO 크기</h2>
+            <span id="icoSizeValue">6개</span>
+          </div>
+          <div class="icon-size-grid">
+            <label><input type="checkbox" name="icoSize" value="16" checked />16</label>
+            <label><input type="checkbox" name="icoSize" value="32" checked />32</label>
+            <label><input type="checkbox" name="icoSize" value="48" checked />48</label>
+            <label><input type="checkbox" name="icoSize" value="64" checked />64</label>
+            <label><input type="checkbox" name="icoSize" value="128" checked />128</label>
+            <label><input type="checkbox" name="icoSize" value="256" checked />256</label>
+          </div>
+        </section>
+
+        <div class="action-row">
+          <button type="button" class="primary-button" id="convertButton" disabled>변환하기</button>
+          <a class="ghost-button disabled" id="convertDownloadButton" download>파일 저장</a>
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="변환 미리보기">
+        <div class="stage-toolbar">
+          <div>
+            <h2 id="convertStageTitle">변환 대기</h2>
+            <p id="convertStageMeta">파일을 선택하면 변환 결과가 표시됩니다.</p>
+          </div>
+          <div class="result-meta" id="convertResultMeta">-</div>
+        </div>
+
+        <div class="preview-grid">
+          <article class="preview-pane">
+            <header>
+              <h3>입력</h3>
+              <span id="convertOriginalSize">-</span>
+            </header>
+            <div class="image-frame checkerboard">
+              <img id="convertOriginalPreview" alt="입력 이미지 미리보기" />
+              <span class="empty-state">Input</span>
+            </div>
+          </article>
+
+          <article class="preview-pane">
+            <header>
+              <h3>출력</h3>
+              <span id="convertResultSize">-</span>
+            </header>
+            <div class="image-frame checkerboard">
+              <img id="convertResultPreview" alt="변환 결과 미리보기" />
+              <span class="empty-state">Converted</span>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js?v=6" type="module"></script>
+  </body>
+</html>

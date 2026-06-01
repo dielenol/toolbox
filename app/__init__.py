@@ -1,0 +1,2 @@
+"""Local background removal service."""
+
