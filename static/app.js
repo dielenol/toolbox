@@ -106,6 +106,11 @@ let convertResultUrl = null;
 let convertResultBlob = null;
 let convertResultFormat = null;
 let pageDragDepth = 0;
+let cutoutRequestId = 0;
+let activeCutoutRequestId = 0;
+let convertRequestId = 0;
+let activeConvertRequestId = 0;
+let activeProgressToken = null;
 
 init();
 
@@ -119,6 +124,7 @@ function init() {
   updateConvertControls();
   checkApi();
   syncFloatingActions();
+  window.addEventListener("beforeunload", revokeObjectUrls);
 }
 
 function bindPageDrop() {
@@ -307,6 +313,7 @@ async function checkApi() {
 }
 
 function setFile(file) {
+  cutoutRequestId += 1;
   selectedFile = file;
   processButton.disabled = false;
   stageTitle.textContent = "이미지 준비됨";
@@ -325,10 +332,17 @@ function setFile(file) {
 async function processImage() {
   if (!selectedFile) return;
 
+  const file = selectedFile;
+  const requestId = cutoutRequestId + 1;
+  const progressToken = `cutout-${requestId}`;
+  cutoutRequestId = requestId;
+  activeCutoutRequestId = requestId;
+
   setButtonBusy(processButton, true, "처리 중");
   stageTitle.textContent = "처리 중";
   resultMeta.textContent = "모델 실행";
-  showProgress(
+  showJobProgress(
+    progressToken,
     "누끼 따는 중",
     modelSelect.value === "birefnet-hq"
       ? "고품질 모델로 가장자리를 계산하고 있습니다. 큰 이미지는 조금 걸릴 수 있어요."
@@ -337,7 +351,7 @@ async function processImage() {
   syncFloatingActions();
 
   const formData = new FormData();
-  formData.append("file", selectedFile);
+  formData.append("file", file);
   formData.append("model_name", modelSelect.value);
   formData.append("alpha_matting", String(alphaMatting.checked));
   formData.append("post_process_mask", String(postProcess.checked));
@@ -364,26 +378,32 @@ async function processImage() {
     const height = response.headers.get("X-Image-Height");
     const elapsed = response.headers.get("X-Process-Time-Ms");
 
+    if (!isCurrentCutoutRequest(requestId, file)) return;
+
     clearResult();
     resultBlob = blob;
     resultUrl = URL.createObjectURL(blob);
     loadPreview(resultPreview, resultUrl, resultSize, width, height);
     downloadButton.href = resultUrl;
-    downloadButton.download = buildCutoutName(selectedFile.name);
+    downloadButton.download = buildCutoutName(file.name);
     downloadButton.classList.remove("disabled");
     webpDownloadButton.disabled = false;
     webpDownloadButton.classList.remove("disabled");
 
     stageTitle.textContent = "완료";
-    stageMeta.textContent = selectedFile.name;
+    stageMeta.textContent = file.name;
     resultMeta.textContent = elapsed ? `${Number(elapsed).toLocaleString()} ms` : "완료";
   } catch (error) {
+    if (!isCurrentCutoutRequest(requestId, file)) return;
     stageTitle.textContent = "처리 실패";
     resultMeta.textContent = "오류";
     stageMeta.textContent = error.message;
   } finally {
-    hideProgress();
-    setButtonBusy(processButton, false, "누끼 따기");
+    hideJobProgress(progressToken);
+    if (activeCutoutRequestId === requestId) {
+      activeCutoutRequestId = 0;
+      setButtonBusy(processButton, false, "누끼 따기");
+    }
     syncFloatingActions();
   }
 }
@@ -457,6 +477,7 @@ async function saveCutoutPng(event) {
 }
 
 function setConvertFile(file) {
+  convertRequestId += 1;
   convertFile = file;
   convertButton.disabled = false;
   convertStageTitle.textContent = "파일 준비됨";
@@ -475,14 +496,20 @@ function setConvertFile(file) {
 async function convertImage() {
   if (!convertFile) return;
 
+  const file = convertFile;
+  const requestId = convertRequestId + 1;
+  const progressToken = `convert-${requestId}`;
+  convertRequestId = requestId;
+  activeConvertRequestId = requestId;
+
   setButtonBusy(convertButton, true, "변환 중");
   convertStageTitle.textContent = "변환 중";
   convertResultMeta.textContent = convertFormat.value.toUpperCase();
-  showProgress("파일 변환 중", `${convertFormat.value.toUpperCase()} 파일을 만들고 있습니다.`);
+  showJobProgress(progressToken, "파일 변환 중", `${convertFormat.value.toUpperCase()} 파일을 만들고 있습니다.`);
   syncFloatingActions();
 
   const formData = new FormData();
-  formData.append("file", convertFile);
+  formData.append("file", file);
   formData.append("output_format", convertFormat.value);
   formData.append("background_color", backgroundColor.value);
   formData.append("quality", convertQuality.value);
@@ -506,25 +533,31 @@ async function convertImage() {
     const elapsed = response.headers.get("X-Process-Time-Ms");
     const outputFormat = response.headers.get("X-Output-Format") || convertFormat.value;
 
+    if (!isCurrentConvertRequest(requestId, file)) return;
+
     clearConvertResult();
     convertResultBlob = blob;
     convertResultFormat = outputFormat;
     convertResultUrl = URL.createObjectURL(blob);
     loadPreview(convertResultPreview, convertResultUrl, convertResultSize, width, height);
     convertDownloadButton.href = convertResultUrl;
-    convertDownloadButton.download = buildConvertedName(convertFile.name, outputFormat);
+    convertDownloadButton.download = buildConvertedName(file.name, outputFormat);
     convertDownloadButton.classList.remove("disabled");
 
     convertStageTitle.textContent = "변환 완료";
-    convertStageMeta.textContent = `${convertFile.name} → ${outputFormat.toUpperCase()}`;
+    convertStageMeta.textContent = `${file.name} → ${outputFormat.toUpperCase()}`;
     convertResultMeta.textContent = elapsed ? `${Number(elapsed).toLocaleString()} ms` : "완료";
   } catch (error) {
+    if (!isCurrentConvertRequest(requestId, file)) return;
     convertStageTitle.textContent = "변환 실패";
     convertResultMeta.textContent = "오류";
     convertStageMeta.textContent = error.message;
   } finally {
-    hideProgress();
-    setButtonBusy(convertButton, false, "변환하기");
+    hideJobProgress(progressToken);
+    if (activeConvertRequestId === requestId) {
+      activeConvertRequestId = 0;
+      setButtonBusy(convertButton, false, "변환하기");
+    }
     syncFloatingActions();
   }
 }
@@ -625,4 +658,29 @@ function updateModelHelp() {
   const model = modelSelect.value;
   modelProfile.textContent = modelProfiles[model] ?? "사용자 선택";
   modelHelp.textContent = modelHelps[model] ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
+}
+
+function showJobProgress(token, title, detail) {
+  activeProgressToken = token;
+  showProgress(title, detail);
+}
+
+function hideJobProgress(token) {
+  if (activeProgressToken !== token) return;
+  activeProgressToken = null;
+  hideProgress();
+}
+
+function isCurrentCutoutRequest(requestId, file) {
+  return requestId === cutoutRequestId && selectedFile === file;
+}
+
+function isCurrentConvertRequest(requestId, file) {
+  return requestId === convertRequestId && convertFile === file;
+}
+
+function revokeObjectUrls() {
+  for (const url of [originalUrl, resultUrl, convertOriginalUrl, convertResultUrl]) {
+    if (url) URL.revokeObjectURL(url);
+  }
 }
