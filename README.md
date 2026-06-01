@@ -1,10 +1,29 @@
 # Toolbox
 
-로컬에서 실행하는 고품질 이미지 작업대입니다. 누끼 탭은 모델이 만든 알파 마스크를 원본 해상도에 합성해 투명 PNG로 저장하고, 결과물을 손실이 거의 없는 WebP로도 저장할 수 있습니다. 파일 변환 탭은 PNG, JPG, WebP, BMP, TIFF, ICO 사이를 로컬에서 변환합니다.
+로컬에서 실행하는 이미지 작업대입니다. 브라우저 UI에서 배경제거(누끼)와 이미지 확장자 변환을 처리하고, 결과 파일은 사용자가 고른 위치에 저장할 수 있습니다.
 
-기본 누끼 모델은 Photoshop/Adobe Express류의 원클릭 배경제거에 더 가까운 결과를 노리는 `BiRefNet HQ`입니다. 모델 실행과 파일 저장은 로컬 서버에서 처리합니다.
+기본 누끼 모델은 `BiRefNet HQ`입니다. Photoshop/Adobe Express류의 원클릭 배경제거에 가까운 품질을 목표로 하며, 모델 실행과 파일 저장은 로컬 서버에서 처리합니다.
 
-## 실행
+## 기능
+
+- 고품질 배경제거: `BiRefNet HQ`, `ISNet`, `U2-Net`, 인물/애니 특화 모델 선택
+- 품질 프리셋: `Ultra`, `Studio`, `Balanced`, `Fast`
+- 엣지 보정: 머리카락/반투명 보정, 마스크 정리, 테두리 색 번짐 제거
+- 저장 형식: 투명 PNG 저장, 무손실 WebP 최적화 저장
+- 파일 변환: PNG, JPG, WebP, BMP, TIFF, ICO 상호 변환
+- 크기 조정: 원본 유지, 긴 변 기준 최대 128px, 256px, 512px
+- 저장 위치 선택: 브라우저 저장 API 또는 로컬 데스크톱 저장 대화상자
+- 드래그 앤 드롭: 파일 업로드 영역뿐 아니라 페이지 전체 드롭 지원
+- 진행 표시: 누끼/변환/WebP 저장 중 중앙 progress overlay 표시
+
+## 요구 사항
+
+- Windows 기준으로 작성되어 있습니다.
+- Python 3.10 이상을 권장합니다.
+- 첫 실행 때 모델 파일을 내려받기 때문에 인터넷 연결이 필요할 수 있습니다.
+- `BiRefNet HQ`는 CPU에서도 동작하지만 큰 이미지는 느릴 수 있습니다. CUDA 환경은 별도 PyTorch 설치 구성이 필요합니다.
+
+## 설치 및 실행
 
 ```powershell
 python -m venv .venv
@@ -14,42 +33,121 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-브라우저에서 `http://127.0.0.1:8000`을 엽니다. 첫 실행 때는 선택한 모델 파일을 내려받기 때문에 시간이 더 걸릴 수 있습니다. `BiRefNet HQ`는 CPU에서도 동작하지만, 큰 이미지는 느릴 수 있습니다.
+브라우저에서 `http://127.0.0.1:8000`을 엽니다.
 
-## 품질/성능 옵션
+이미 다른 서비스가 8000번 포트를 쓰고 있으면 다른 포트를 지정합니다.
 
-- `BiRefNet HQ`: 복잡한 물체, 제품 사진, 머리카락/털 경계를 가장 우선하는 고품질 기본값입니다.
-- `ISNet General`: 빠르면서도 깔끔한 기존 기본 모델입니다.
-- `U2-Net`: 품질과 속도의 균형이 좋습니다.
-- `U2-Netp`: 빠른 미리보기용입니다.
-- `Human Segmentation`: 인물 사진에 맞춘 모델입니다.
-- `ISNet Anime`: 애니메이션/일러스트 이미지에 적합합니다.
+```powershell
+uvicorn app.main:app --host 127.0.0.1 --port 8010
+```
 
-`Ultra` 프리셋은 `BiRefNet HQ`, 머리카락/반투명 보정, 마스크 정리, 테두리 색 번짐 제거를 켭니다. 많은 이미지를 빠르게 처리해야 하면 `Fast` 프리셋이나 `U2-Netp` 모델을 선택하세요.
+## 사용 흐름
 
-## 안전/제한
+### 누끼
+
+1. `누끼` 탭에서 이미지를 선택하거나 페이지에 드롭합니다.
+2. 품질 프리셋을 고릅니다. 처음에는 `Ultra`를 권장합니다.
+3. 필요하면 모델, 엣지, 임계값을 조정합니다.
+4. `누끼 따기`를 누릅니다.
+5. 결과를 `PNG 저장` 또는 `WebP 저장`으로 저장합니다.
+
+### 파일 변환
+
+1. `파일 변환` 탭에서 이미지를 선택하거나 페이지에 드롭합니다.
+2. 출력 형식을 고릅니다.
+3. JPG/BMP는 배경색, JPG/WebP는 품질, ICO는 포함할 아이콘 크기를 조정합니다.
+4. 필요하면 출력 최대 크기를 선택합니다.
+5. `변환하기` 후 `파일 저장`으로 저장합니다.
+
+## 품질 옵션 가이드
+
+### 모델
+
+- `BiRefNet HQ`: 제품 사진, 머리카락, 털, 복잡한 배경처럼 경계 품질이 중요한 이미지에 적합합니다.
+- `ISNet General`: 품질과 속도의 균형이 좋습니다.
+- `U2-Net`: 일반적인 이미지에서 빠르고 안정적입니다.
+- `U2-Netp`: 가장 빠른 미리보기용 모델입니다.
+- `Human Segmentation`: 사람 중심 사진에 적합합니다.
+- `ISNet Anime`: 애니메이션, 일러스트, 캐릭터 이미지에 적합합니다.
+
+### 프리셋
+
+- `Ultra`: 최고 품질 우선. 느리지만 복잡한 경계에 유리합니다.
+- `Studio`: 품질 우선. 제품 사진이나 인물에 무난합니다.
+- `Balanced`: 속도와 품질의 중간값입니다.
+- `Fast`: 빠른 확인이나 단순한 배경에 적합합니다.
+
+### 세부 옵션
+
+- 머리카락/반투명 보정: 얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.
+- 마스크 정리: 배경에 남은 점이나 작은 구멍을 정리합니다.
+- 테두리 색 번짐 제거: 기존 배경색이 피사체 가장자리에 묻은 현상을 줄입니다.
+- 부드럽게: 경계의 계단 현상을 줄입니다. 많이 올리면 얇은 디테일이 흐려질 수 있습니다.
+- 안쪽으로 줄이기: 배경 잔여 테두리를 줄입니다. 많이 올리면 피사체 윤곽이 깎일 수 있습니다.
+- 피사체 확신/배경 확신: alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 기본값을 유지하세요.
+
+## 제한과 보안
 
 - 업로드 파일은 기본 100 MB까지 허용합니다.
 - 이미지는 기본 80 MP까지 처리합니다.
-- 이미지 픽셀 수는 파일 전체를 디코딩하기 전에 헤더 기준으로 먼저 검사합니다.
-- `BiRefNet HQ`는 Hugging Face 모델 저장소의 커스텀 코드를 사용하므로 기본 revision을 고정해 실행합니다. 다른 revision을 쓰려면 `TOOLBOX_BIREFNET_REVISION`을 명시하세요.
-- 브라우저 저장 API를 지원하지 않는 환경에서는 로컬 서버가 저장 위치 선택 대화상자를 띄웁니다.
+- 픽셀 수는 파일 전체를 디코딩하기 전에 이미지 헤더 기준으로 먼저 검사합니다.
+- `BiRefNet HQ`는 Hugging Face 모델 저장소의 커스텀 코드를 사용합니다. 기본 revision은 고정되어 있으며, 변경하려면 `TOOLBOX_BIREFNET_REVISION`을 명시하세요.
+- `/api/save`는 로컬 저장 대화상자를 띄우기 위해 데스크톱 환경의 `tkinter`를 사용합니다.
+- 이 프로젝트는 로컬 작업용입니다. 외부 네트워크에 공개해서 쓰는 서버로 설계되어 있지 않습니다.
 
 ## 환경 변수
 
 새 설정 이름은 `TOOLBOX_*`입니다. 기존 `NUKKI_*` 이름도 호환됩니다.
 
-- `TOOLBOX_MODEL`: 기본 모델명입니다. 기본값은 `birefnet-hq`입니다.
-- `TOOLBOX_BIREFNET_REPO`: BiRefNet 모델 저장소입니다. 기본값은 `ZhengPeng7/BiRefNet`입니다.
-- `TOOLBOX_BIREFNET_REVISION`: BiRefNet 모델 revision입니다. 기본값은 `e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4`입니다.
-- `TOOLBOX_BIREFNET_SIZE`: BiRefNet 추론 입력 크기입니다. 기본값은 `1024`이며 256부터 2048 사이를 허용합니다.
-- `TOOLBOX_TORCH_THREADS`: CPU 추론에 사용할 PyTorch 스레드 수입니다.
-- `TOOLBOX_MAX_PIXELS`: 허용할 최대 픽셀 수입니다. 기본값은 `80000000`입니다.
-- `TOOLBOX_MAX_UPLOAD_BYTES`: 허용할 최대 업로드 파일 크기입니다. 기본값은 `104857600`입니다.
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `TOOLBOX_MODEL` | `birefnet-hq` | 기본 누끼 모델 |
+| `TOOLBOX_BIREFNET_REPO` | `ZhengPeng7/BiRefNet` | BiRefNet 모델 저장소 |
+| `TOOLBOX_BIREFNET_REVISION` | `e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4` | BiRefNet 모델 revision |
+| `TOOLBOX_BIREFNET_SIZE` | `1024` | BiRefNet 추론 입력 크기. 256부터 2048 사이 |
+| `TOOLBOX_TORCH_THREADS` | `0` | CPU 추론용 PyTorch 스레드 수. 0이면 기본값 사용 |
+| `TOOLBOX_MAX_PIXELS` | `80000000` | 허용할 최대 픽셀 수 |
+| `TOOLBOX_MAX_UPLOAD_BYTES` | `104857600` | 허용할 최대 업로드 파일 크기 |
 
 잘못된 숫자 설정값은 앱을 즉시 중단하지 않고 기본값으로 되돌립니다.
 
+예시:
+
+```powershell
+$env:TOOLBOX_MAX_UPLOAD_BYTES = "52428800"
+$env:TOOLBOX_TORCH_THREADS = "4"
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
 ## API
+
+### 상태 확인
+
+```http
+GET /api/health
+```
+
+응답:
+
+```json
+{ "status": "ok" }
+```
+
+### 모델 목록
+
+```http
+GET /api/models
+```
+
+사용 가능한 누끼 모델과 기본 모델을 반환합니다.
+
+### 변환 형식 목록
+
+```http
+GET /api/formats
+```
+
+사용 가능한 출력 형식과 기본 형식을 반환합니다.
 
 ### 배경 제거
 
@@ -65,10 +163,20 @@ Content-Type: multipart/form-data
 - `alpha_matting`: `true` 또는 `false`
 - `post_process_mask`: `true` 또는 `false`
 - `foreground_refine`: `true` 또는 `false`
-- `foreground_threshold`, `background_threshold`, `erode_size`, `edge_feather`
-- `png_compression`: PNG 압축 레벨입니다. 0부터 9 사이로 보정됩니다.
+- `foreground_threshold`: 피사체 확신 기준값
+- `background_threshold`: 배경 확신 기준값
+- `erode_size`: 마스크를 안쪽으로 줄이는 정도
+- `edge_feather`: 경계 부드럽게 처리할 반경
+- `png_compression`: PNG 압축 레벨. 0부터 9 사이로 보정됩니다.
 
 응답은 투명 배경의 PNG입니다.
+
+응답 헤더:
+
+- `X-Image-Width`: 결과 이미지 너비
+- `X-Image-Height`: 결과 이미지 높이
+- `X-Model`: 사용한 모델
+- `X-Process-Time-Ms`: 처리 시간
 
 ### 파일 변환
 
@@ -81,13 +189,21 @@ Content-Type: multipart/form-data
 
 - `file`: 이미지 파일
 - `output_format`: `png`, `jpg`, `webp`, `bmp`, `tiff`, `ico`
-- `background_color`: JPG/BMP처럼 알파 채널이 없는 형식으로 저장할 때 사용할 배경색입니다.
-- `quality`: JPG/WebP 품질입니다.
-- `webp_lossless`: WebP를 무손실로 저장할지 여부입니다.
-- `ico_sizes`: `16,32,48,64,128,256` 같은 ICO 출력 크기 목록입니다. ICO는 8부터 256 사이만 허용합니다.
-- `output_size`: 긴 변 기준 최대 크기입니다. `0`이면 원본 크기를 유지하고, 8부터 4096 사이 값을 허용합니다.
+- `background_color`: JPG/BMP처럼 알파 채널이 없는 형식으로 저장할 때 사용할 배경색
+- `quality`: JPG/WebP 품질
+- `webp_lossless`: WebP를 무손실로 저장할지 여부
+- `ico_sizes`: `16,32,48,64,128,256` 같은 ICO 출력 크기 목록. ICO는 8부터 256 사이만 허용합니다.
+- `output_size`: 긴 변 기준 최대 크기. `0`이면 원본 크기를 유지하고, 8부터 4096 사이 값을 허용합니다.
 
 응답은 선택한 형식의 이미지 파일입니다.
+
+응답 헤더:
+
+- `X-Image-Width`: 결과 이미지 너비
+- `X-Image-Height`: 결과 이미지 높이
+- `X-Output-Format`: 출력 형식
+- `X-Optimization-Mode`: `lossless` 또는 `standard`
+- `X-Process-Time-Ms`: 처리 시간
 
 ### 로컬 저장
 
@@ -102,4 +218,68 @@ Content-Type: multipart/form-data
 - `suggested_name`: 저장 대화상자에 표시할 기본 파일명
 - `output_format`: 저장할 파일 형식
 
-응답은 `{ "saved": true }` 또는 `{ "saved": false }`입니다. 저장 위치 선택은 로컬 데스크톱 대화상자로 처리됩니다.
+응답:
+
+```json
+{ "saved": true }
+```
+
+사용자가 저장을 취소하면 다음처럼 응답합니다.
+
+```json
+{ "saved": false }
+```
+
+## 개발
+
+프로젝트 구조:
+
+```text
+app/
+  main.py        FastAPI 엔드포인트
+  remover.py     배경제거 모델 실행과 후처리
+  converter.py   이미지 형식 변환
+  local_save.py  로컬 저장 대화상자
+  settings.py    환경 변수와 제한값
+static/
+  index.html     브라우저 UI
+  app.js         UI 이벤트와 API 호출
+  js/            프론트 유틸 모듈
+tests/
+  test_converter.py
+```
+
+검증:
+
+```powershell
+python -m compileall app tests
+python -m unittest discover -s tests
+```
+
+JS 문법 확인:
+
+```powershell
+Get-ChildItem -Path static -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
+```
+
+## 문제 해결
+
+### 첫 누끼 실행이 오래 걸림
+
+첫 실행 때 모델 파일을 내려받고 로딩합니다. 이후 실행은 캐시를 사용하므로 더 빨라집니다.
+
+### `BiRefNet HQ`가 너무 느림
+
+`Studio`, `Balanced`, `Fast` 프리셋을 쓰거나 모델을 `ISNet General`, `U2-Net`, `U2-Netp`로 바꿔보세요. CPU 환경에서는 큰 이미지가 오래 걸릴 수 있습니다.
+
+### 저장 위치 선택창이 뜨지 않음
+
+브라우저가 File System Access API를 지원하지 않으면 서버의 로컬 저장 대화상자로 대체됩니다. 이때 Python 환경에 `tkinter`가 필요합니다.
+
+### 파일이 너무 크다는 오류가 남
+
+기본 제한은 업로드 100 MB, 이미지 80 MP입니다. 필요하면 `TOOLBOX_MAX_UPLOAD_BYTES`, `TOOLBOX_MAX_PIXELS`를 조정하세요.
+
+### WebP가 생각보다 큼
+
+누끼 결과의 `WebP 저장`은 품질 손실을 피하기 위해 무손실 WebP를 사용합니다. 더 작은 파일이 필요하면 파일 변환 탭에서 WebP 품질 값을 낮춰 저장하세요.
