@@ -7,6 +7,7 @@
 ## 기능
 
 - 고품질 배경제거: `BiRefNet HQ`, `ISNet`, `U2-Net`, 인물/애니 특화 모델 선택
+- 벌크 배경제거: 여러 이미지를 순차 처리하고 성공 결과를 ZIP으로 저장
 - 품질 프리셋: `Ultra`, `Studio`, `Balanced`, `Fast`
 - 엣지 보정: 머리카락/반투명 보정, 마스크 정리, 테두리 색 번짐 제거
 - 저장 형식: 투명 PNG 저장, 무손실 WebP 최적화 저장
@@ -14,7 +15,7 @@
 - 크기 조정: 원본 유지, 긴 변 기준 최대 128px, 256px, 512px
 - 저장 위치 선택: 브라우저 저장 API 또는 로컬 데스크톱 저장 대화상자
 - 드래그 앤 드롭: 파일 업로드 영역뿐 아니라 페이지 전체 드롭 지원
-- 진행 표시: 누끼/변환/WebP 저장 중 중앙 progress overlay 표시
+- 진행 표시: 누끼/벌크누끼/변환/WebP 저장 중 중앙 progress overlay 표시
 
 ## 요구 사항
 
@@ -50,6 +51,14 @@ uvicorn app.main:app --host 127.0.0.1 --port 8010
 3. 필요하면 모델, 엣지, 임계값을 조정합니다.
 4. `누끼 따기`를 누릅니다.
 5. 결과를 `PNG 저장` 또는 `WebP 저장`으로 저장합니다.
+
+### 벌크누끼
+
+1. `벌크누끼` 탭에서 여러 이미지를 선택하거나 페이지에 드롭합니다.
+2. 품질 프리셋과 모델을 고릅니다.
+3. 필요하면 엣지, 임계값, 보정 옵션을 조정합니다.
+4. `벌크 누끼`를 누르면 파일별로 순차 처리합니다.
+5. 완료된 결과는 ZIP으로 묶이며 `ZIP 저장`으로 저장합니다.
 
 ### 파일 변환
 
@@ -204,6 +213,24 @@ Content-Type: multipart/form-data
 - `X-Output-Format`: 출력 형식
 - `X-Optimization-Mode`: `lossless` 또는 `standard`
 - `X-Process-Time-Ms`: 처리 시간
+
+### ZIP 묶기
+
+```http
+POST /api/archive
+Content-Type: multipart/form-data
+```
+
+필드:
+
+- `files`: ZIP에 넣을 파일 목록
+- `archive_name`: 내려받을 ZIP 파일명
+
+응답은 ZIP 압축 파일입니다.
+
+응답 헤더:
+
+- `X-Archive-Count`: ZIP에 포함된 파일 수
 
 ### 로컬 저장
 
