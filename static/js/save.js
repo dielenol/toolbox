@@ -56,6 +56,7 @@ export function getSaveFileTypes(format) {
     bmp: { description: "BMP 이미지", mime: "image/bmp", extensions: [".bmp"] },
     tiff: { description: "TIFF 이미지", mime: "image/tiff", extensions: [".tif", ".tiff"] },
     ico: { description: "ICO 아이콘", mime: "image/x-icon", extensions: [".ico"] },
+    zip: { description: "ZIP 압축 파일", mime: "application/zip", extensions: [".zip"] },
   };
   const profile = profiles[normalizedFormat] ?? profiles.png;
   return [

@@ -1,6 +1,7 @@
 import { formatProfiles, modelHelps, modelProfiles, presetHelps, presets } from "./js/config.js";
 import { el, getIcoSizeInputs, getSelectedIcoSizes } from "./js/elements.js";
 import {
+  buildBulkArchiveName,
   buildConvertedName,
   buildCutoutName,
   buildCutoutWebpName,
@@ -66,6 +67,42 @@ const {
   erodeHelp,
   foregroundHelp,
   backgroundHelp,
+  bulkFileInput,
+  bulkDropzone,
+  bulkFileMeta,
+  bulkActionRow,
+  bulkProcessButton,
+  bulkSaveButton,
+  bulkClearButton,
+  bulkFloatingActions,
+  floatingBulkProcessButton,
+  floatingBulkSaveButton,
+  bulkModelSelect,
+  bulkModelProfile,
+  bulkQualityMode,
+  bulkModelHelp,
+  bulkPresetHelp,
+  bulkAlphaMatting,
+  bulkPostProcess,
+  bulkForegroundRefine,
+  bulkEdgeFeather,
+  bulkErodeSize,
+  bulkForegroundThreshold,
+  bulkBackgroundThreshold,
+  bulkEdgeValue,
+  bulkThresholdValue,
+  bulkFeatherHelp,
+  bulkErodeHelp,
+  bulkForegroundHelp,
+  bulkBackgroundHelp,
+  bulkStageTitle,
+  bulkStageMeta,
+  bulkResultMeta,
+  bulkQueueList,
+  bulkDoneCount,
+  bulkFailCount,
+  bulkTotalCount,
+  bulkArchiveSize,
   convertFileInput,
   convertDropzone,
   convertFileMeta,
@@ -94,6 +131,7 @@ const {
   convertStageMeta,
   convertResultMeta,
   segments,
+  bulkSegments,
 } = el;
 
 let selectedFile = null;
@@ -105,11 +143,16 @@ let convertOriginalUrl = null;
 let convertResultUrl = null;
 let convertResultBlob = null;
 let convertResultFormat = null;
+let bulkItems = [];
+let bulkArchiveBlob = null;
+let bulkArchiveName = buildBulkArchiveName();
 let pageDragDepth = 0;
 let cutoutRequestId = 0;
 let activeCutoutRequestId = 0;
 let convertRequestId = 0;
 let activeConvertRequestId = 0;
+let bulkRequestId = 0;
+let activeBulkRequestId = 0;
 let activeProgressToken = null;
 
 init();
@@ -119,8 +162,10 @@ function init() {
   bindPageDrop();
   bindFloatingActions();
   bindCutoutEvents();
+  bindBulkEvents();
   bindConvertEvents();
   applyPreset("ultra");
+  applyBulkPreset("ultra");
   updateConvertControls();
   checkApi();
   syncFloatingActions();
@@ -154,8 +199,8 @@ function bindPageDrop() {
     pageDragDepth = 0;
     hidePageDropOverlay();
 
-    const file = Array.from(event.dataTransfer.files).find(Boolean);
-    if (file) useDroppedFile(file);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length) useDroppedFiles(files);
   });
 }
 
@@ -169,6 +214,8 @@ function bindFloatingActions() {
   floatingProcessButton.addEventListener("click", () => processButton.click());
   floatingDownloadButton.addEventListener("click", () => downloadButton.click());
   floatingWebpButton.addEventListener("click", () => webpDownloadButton.click());
+  floatingBulkProcessButton.addEventListener("click", () => bulkProcessButton.click());
+  floatingBulkSaveButton.addEventListener("click", () => bulkSaveButton.click());
   floatingConvertButton.addEventListener("click", () => convertButton.click());
   floatingConvertDownloadButton.addEventListener("click", () => convertDownloadButton.click());
 
@@ -176,6 +223,7 @@ function bindFloatingActions() {
     threshold: 0.01,
   });
   observer.observe(cutoutActionRow);
+  observer.observe(bulkActionRow);
   observer.observe(convertActionRow);
 
   window.addEventListener("scroll", () => requestAnimationFrame(syncFloatingActions), { passive: true });
@@ -200,21 +248,27 @@ function getActiveView() {
 function syncFloatingActions() {
   const activeView = getActiveView();
   const cutoutHasWork = Boolean(selectedFile || resultBlob);
+  const bulkHasWork = bulkItems.length > 0 || Boolean(bulkArchiveBlob);
   const convertHasWork = Boolean(convertFile || convertResultUrl);
   const cutoutShouldFloat = activeView === "cutout" && cutoutHasWork && !isActionRowVisible(cutoutActionRow);
+  const bulkShouldFloat = activeView === "bulk" && bulkHasWork && !isActionRowVisible(bulkActionRow);
   const convertShouldFloat = activeView === "convert" && convertHasWork && !isActionRowVisible(convertActionRow);
 
   cutoutFloatingActions.hidden = !cutoutShouldFloat;
+  bulkFloatingActions.hidden = !bulkShouldFloat;
   convertFloatingActions.hidden = !convertShouldFloat;
-  document.body.classList.toggle("has-floating-actions", cutoutShouldFloat || convertShouldFloat);
+  document.body.classList.toggle("has-floating-actions", cutoutShouldFloat || bulkShouldFloat || convertShouldFloat);
 
   floatingProcessButton.disabled = processButton.disabled;
   floatingDownloadButton.disabled = isDisabledDownload(downloadButton);
   floatingWebpButton.disabled = webpDownloadButton.disabled;
+  floatingBulkProcessButton.disabled = bulkProcessButton.disabled;
+  floatingBulkSaveButton.disabled = bulkSaveButton.disabled;
   floatingConvertButton.disabled = convertButton.disabled;
   floatingConvertDownloadButton.disabled = isDisabledDownload(convertDownloadButton);
   mirrorActionState(floatingProcessButton, processButton);
   mirrorActionState(floatingWebpButton, webpDownloadButton);
+  mirrorActionState(floatingBulkProcessButton, bulkProcessButton);
   mirrorActionState(floatingConvertButton, convertButton);
 }
 
@@ -238,6 +292,24 @@ function bindCutoutEvents() {
   webpDownloadButton.addEventListener("click", downloadCutoutWebp);
 }
 
+function bindBulkEvents() {
+  bindBulkFilePicker();
+
+  bulkSegments.forEach((button) => {
+    button.addEventListener("click", () => applyBulkPreset(button.dataset.bulkPreset));
+  });
+
+  bulkModelSelect.addEventListener("change", updateBulkModelHelp);
+
+  for (const input of [bulkEdgeFeather, bulkErodeSize, bulkForegroundThreshold, bulkBackgroundThreshold]) {
+    input.addEventListener("input", refreshBulkLabels);
+  }
+
+  bulkProcessButton.addEventListener("click", processBulkImages);
+  bulkSaveButton.addEventListener("click", saveBulkArchive);
+  bulkClearButton.addEventListener("click", clearBulkFiles);
+}
+
 function bindConvertEvents() {
   bindFilePicker(convertFileInput, convertDropzone, setConvertFile);
   convertFormat.addEventListener("change", updateConvertControls);
@@ -248,6 +320,32 @@ function bindConvertEvents() {
   });
   convertButton.addEventListener("click", convertImage);
   convertDownloadButton.addEventListener("click", saveConvertedFile);
+}
+
+function bindBulkFilePicker() {
+  bulkFileInput.addEventListener("change", () => {
+    const files = Array.from(bulkFileInput.files || []);
+    if (files.length) setBulkFiles(files);
+  });
+
+  for (const eventName of ["dragenter", "dragover"]) {
+    bulkDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      bulkDropzone.classList.add("dragging");
+    });
+  }
+
+  for (const eventName of ["dragleave", "drop"]) {
+    bulkDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      bulkDropzone.classList.remove("dragging");
+    });
+  }
+
+  bulkDropzone.addEventListener("drop", (event) => {
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length) setBulkFiles(files);
+  });
 }
 
 function bindFilePicker(input, zone, onFile) {
@@ -276,16 +374,22 @@ function bindFilePicker(input, zone, onFile) {
   });
 }
 
-function useDroppedFile(file) {
+function useDroppedFiles(files) {
   const view = getActiveView();
-  if (!isSupportedForView(file, view)) {
+  const supportedFiles = files.filter((file) => isSupportedForView(file, view));
+  if (!supportedFiles.length) {
     const message =
       view === "convert"
         ? "변환 탭은 PNG, JPG, WebP, BMP, TIFF, ICO 파일을 지원합니다."
+        : view === "bulk"
+          ? "벌크누끼 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다."
         : "누끼 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다.";
     if (view === "convert") {
       convertStageTitle.textContent = "파일 확인 필요";
       convertStageMeta.textContent = message;
+    } else if (view === "bulk") {
+      bulkStageTitle.textContent = "파일 확인 필요";
+      bulkStageMeta.textContent = message;
     } else {
       stageTitle.textContent = "파일 확인 필요";
       stageMeta.textContent = message;
@@ -294,9 +398,11 @@ function useDroppedFile(file) {
   }
 
   if (view === "convert") {
-    setConvertFile(file);
+    setConvertFile(supportedFiles[0]);
+  } else if (view === "bulk") {
+    setBulkFiles(supportedFiles);
   } else {
-    setFile(file);
+    setFile(supportedFiles[0]);
   }
 }
 
@@ -476,6 +582,254 @@ async function saveCutoutPng(event) {
   }
 }
 
+function setBulkFiles(files) {
+  const supportedFiles = files.filter((file) => isSupportedForView(file, "bulk"));
+  const rejectedCount = files.length - supportedFiles.length;
+  bulkRequestId += 1;
+  bulkArchiveBlob = null;
+  bulkArchiveName = buildBulkArchiveName();
+  bulkItems = supportedFiles.map((file) => ({
+    file,
+    status: "ready",
+    statusLabel: "대기",
+    detail: formatBytes(file.size),
+    result: null,
+  }));
+
+  bulkProcessButton.disabled = bulkItems.length === 0;
+  bulkSaveButton.disabled = true;
+  bulkClearButton.disabled = bulkItems.length === 0;
+  bulkStageTitle.textContent = bulkItems.length ? "파일 준비됨" : "파일 확인 필요";
+  bulkStageMeta.textContent = rejectedCount
+    ? `${bulkItems.length}개 선택됨 · 지원하지 않는 파일 ${rejectedCount}개 제외`
+    : `${bulkItems.length}개 선택됨`;
+  bulkResultMeta.textContent = "-";
+  bulkArchiveSize.textContent = "-";
+  renderBulkQueue();
+  syncFloatingActions();
+}
+
+async function processBulkImages() {
+  if (!bulkItems.length) return;
+
+  const requestId = bulkRequestId + 1;
+  const progressToken = `bulk-${requestId}`;
+  const options = getBulkRemoveOptions();
+  const results = [];
+  bulkRequestId = requestId;
+  activeBulkRequestId = requestId;
+  bulkArchiveBlob = null;
+  bulkArchiveName = buildBulkArchiveName();
+  bulkSaveButton.disabled = true;
+  bulkArchiveSize.textContent = "-";
+  bulkItems = bulkItems.map((item) => ({
+    ...item,
+    status: "ready",
+    statusLabel: "대기",
+    detail: formatBytes(item.file.size),
+    result: null,
+  }));
+
+  setButtonBusy(bulkProcessButton, true, "처리 중");
+  bulkClearButton.disabled = true;
+  bulkStageTitle.textContent = "벌크 처리 중";
+  bulkResultMeta.textContent = `0 / ${bulkItems.length}`;
+  renderBulkQueue();
+  showJobProgress(progressToken, "벌크 누끼 처리 중", `1 / ${bulkItems.length} 이미지를 준비하고 있습니다.`);
+  syncFloatingActions();
+
+  try {
+    for (const [index, item] of bulkItems.entries()) {
+      if (!isCurrentBulkRequest(requestId)) return;
+
+      item.status = "processing";
+      item.statusLabel = "처리 중";
+      item.detail = `${index + 1} / ${bulkItems.length} · 모델 실행`;
+      bulkResultMeta.textContent = `${index} / ${bulkItems.length}`;
+      showJobProgress(progressToken, "벌크 누끼 처리 중", `${index + 1} / ${bulkItems.length} · ${item.file.name}`);
+      renderBulkQueue();
+
+      try {
+        const response = await removeFile(item.file, options);
+        const blob = await response.blob();
+        const width = response.headers.get("X-Image-Width");
+        const height = response.headers.get("X-Image-Height");
+        const elapsed = response.headers.get("X-Process-Time-Ms");
+        const filename = buildCutoutName(item.file.name);
+
+        item.status = "done";
+        item.statusLabel = "완료";
+        item.detail = [
+          width && height ? `${width} x ${height}` : null,
+          elapsed ? `${Number(elapsed).toLocaleString()} ms` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        item.result = { blob, filename };
+        results.push(item.result);
+      } catch (error) {
+        item.status = "failed";
+        item.statusLabel = "실패";
+        item.detail = error.message;
+      }
+
+      bulkResultMeta.textContent = `${index + 1} / ${bulkItems.length}`;
+      renderBulkQueue();
+    }
+
+    if (!isCurrentBulkRequest(requestId)) return;
+
+    if (!results.length) {
+      bulkStageTitle.textContent = "처리 실패";
+      bulkStageMeta.textContent = "저장할 수 있는 결과가 없습니다.";
+      bulkResultMeta.textContent = "0개 완료";
+      return;
+    }
+
+    showJobProgress(progressToken, "ZIP 생성 중", `${results.length}개 결과를 ZIP으로 묶고 있습니다.`);
+    bulkArchiveBlob = await createBulkArchive(results, bulkArchiveName);
+    bulkArchiveSize.textContent = formatBytes(bulkArchiveBlob.size);
+    bulkSaveButton.disabled = false;
+    bulkStageTitle.textContent = "벌크 처리 완료";
+    bulkStageMeta.textContent = `${results.length}개 결과를 ZIP으로 준비했습니다.`;
+    bulkResultMeta.textContent = `${results.length}개 완료`;
+  } catch (error) {
+    if (!isCurrentBulkRequest(requestId)) return;
+    bulkStageTitle.textContent = "벌크 처리 실패";
+    bulkStageMeta.textContent = error.message;
+    bulkResultMeta.textContent = "오류";
+  } finally {
+    hideJobProgress(progressToken);
+    if (activeBulkRequestId === requestId) {
+      activeBulkRequestId = 0;
+      setButtonBusy(bulkProcessButton, false, "벌크 누끼");
+      bulkClearButton.disabled = bulkItems.length === 0;
+    }
+    renderBulkQueue();
+    syncFloatingActions();
+  }
+}
+
+async function saveBulkArchive() {
+  if (!bulkArchiveBlob) return;
+
+  setButtonBusy(bulkSaveButton, true, "저장 중");
+  try {
+    const saved = await saveBlobWithPicker(bulkArchiveBlob, bulkArchiveName, getSaveFileTypes("zip"));
+    bulkResultMeta.textContent = saved ? "ZIP 저장 완료" : "저장 취소";
+  } catch (error) {
+    bulkResultMeta.textContent = "ZIP 저장 오류";
+    bulkStageMeta.textContent = error.message;
+  } finally {
+    setButtonBusy(bulkSaveButton, false, "ZIP 저장");
+    syncFloatingActions();
+  }
+}
+
+function clearBulkFiles() {
+  bulkRequestId += 1;
+  bulkItems = [];
+  bulkArchiveBlob = null;
+  bulkArchiveName = buildBulkArchiveName();
+  bulkFileInput.value = "";
+  bulkFileMeta.textContent = "PNG, JPG, WebP, BMP, TIFF";
+  bulkProcessButton.disabled = true;
+  bulkSaveButton.disabled = true;
+  bulkClearButton.disabled = true;
+  bulkStageTitle.textContent = "벌크 작업 대기";
+  bulkStageMeta.textContent = "여러 이미지를 선택하면 파일별 처리 상태가 표시됩니다.";
+  bulkResultMeta.textContent = "-";
+  bulkArchiveSize.textContent = "-";
+  renderBulkQueue();
+  syncFloatingActions();
+}
+
+async function removeFile(file, options) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("model_name", options.modelName);
+  formData.append("alpha_matting", String(options.alphaMatting));
+  formData.append("post_process_mask", String(options.postProcess));
+  formData.append("foreground_refine", String(options.foregroundRefine));
+  formData.append("foreground_threshold", options.foregroundThreshold);
+  formData.append("background_threshold", options.backgroundThreshold);
+  formData.append("erode_size", options.erodeSize);
+  formData.append("edge_feather", options.edgeFeather);
+  formData.append("png_compression", "4");
+
+  const response = await fetch("/api/remove", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `HTTP ${response.status}`);
+  }
+  return response;
+}
+
+async function createBulkArchive(results, archiveName) {
+  const formData = new FormData();
+  formData.append("archive_name", archiveName);
+  results.forEach((result) => {
+    formData.append("files", result.blob, result.filename);
+  });
+
+  const response = await fetch("/api/archive", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `HTTP ${response.status}`);
+  }
+  return response.blob();
+}
+
+function renderBulkQueue() {
+  updateBulkSummary();
+  bulkQueueList.innerHTML = "";
+  if (!bulkItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "bulk-empty";
+    empty.textContent = "처리할 이미지를 선택하세요.";
+    bulkQueueList.append(empty);
+    return;
+  }
+
+  bulkItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `bulk-row ${item.status}`;
+
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = item.file.name;
+    const detail = document.createElement("small");
+    detail.textContent = item.detail || formatBytes(item.file.size);
+    copy.append(name, detail);
+
+    const status = document.createElement("span");
+    status.className = "bulk-status";
+    status.textContent = item.statusLabel;
+
+    row.append(copy, status);
+    bulkQueueList.append(row);
+  });
+}
+
+function updateBulkSummary() {
+  const done = bulkItems.filter((item) => item.status === "done").length;
+  const failed = bulkItems.filter((item) => item.status === "failed").length;
+  bulkTotalCount.textContent = String(bulkItems.length);
+  bulkDoneCount.textContent = String(done);
+  bulkFailCount.textContent = String(failed);
+  bulkFileMeta.textContent = bulkItems.length
+    ? `${bulkItems.length}개 · ${formatBytes(bulkItems.reduce((sum, item) => sum + item.file.size, 0))}`
+    : "PNG, JPG, WebP, BMP, TIFF";
+}
+
 function setConvertFile(file) {
   convertRequestId += 1;
   convertFile = file;
@@ -599,6 +953,41 @@ function applyPreset(name) {
   refreshLabels();
 }
 
+function applyBulkPreset(name) {
+  const preset = presets[name];
+  if (!preset) return;
+
+  bulkAlphaMatting.checked = preset.alphaMatting;
+  bulkPostProcess.checked = preset.postProcess;
+  bulkForegroundRefine.checked = preset.foregroundRefine;
+  bulkModelSelect.value = preset.modelName;
+  updateBulkModelHelp();
+  bulkEdgeFeather.value = preset.edgeFeather;
+  bulkErodeSize.value = preset.erodeSize;
+  bulkForegroundThreshold.value = preset.foregroundThreshold;
+  bulkBackgroundThreshold.value = preset.backgroundThreshold;
+  bulkQualityMode.textContent = capitalize(name);
+  bulkPresetHelp.textContent = presetHelps[name] ?? "선택한 프리셋에 맞춰 모델과 보정 옵션을 조정합니다.";
+
+  bulkSegments.forEach((button) => {
+    button.classList.toggle("active", button.dataset.bulkPreset === name);
+  });
+  refreshBulkLabels();
+}
+
+function getBulkRemoveOptions() {
+  return {
+    modelName: bulkModelSelect.value,
+    alphaMatting: bulkAlphaMatting.checked,
+    postProcess: bulkPostProcess.checked,
+    foregroundRefine: bulkForegroundRefine.checked,
+    foregroundThreshold: bulkForegroundThreshold.value,
+    backgroundThreshold: bulkBackgroundThreshold.value,
+    erodeSize: bulkErodeSize.value,
+    edgeFeather: bulkEdgeFeather.value,
+  };
+}
+
 function updateConvertControls() {
   const format = convertFormat.value;
   const qualityEnabled = ["jpg", "webp"].includes(format);
@@ -654,10 +1043,25 @@ function refreshLabels() {
   backgroundHelp.textContent = describeBackground(Number(backgroundThreshold.value));
 }
 
+function refreshBulkLabels() {
+  bulkEdgeValue.textContent = `${bulkEdgeFeather.value}px`;
+  bulkThresholdValue.textContent = `${bulkForegroundThreshold.value} / ${bulkBackgroundThreshold.value}`;
+  bulkFeatherHelp.textContent = describeFeather(Number(bulkEdgeFeather.value));
+  bulkErodeHelp.textContent = describeErode(Number(bulkErodeSize.value));
+  bulkForegroundHelp.textContent = describeForeground(Number(bulkForegroundThreshold.value));
+  bulkBackgroundHelp.textContent = describeBackground(Number(bulkBackgroundThreshold.value));
+}
+
 function updateModelHelp() {
   const model = modelSelect.value;
   modelProfile.textContent = modelProfiles[model] ?? "사용자 선택";
   modelHelp.textContent = modelHelps[model] ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
+}
+
+function updateBulkModelHelp() {
+  const model = bulkModelSelect.value;
+  bulkModelProfile.textContent = modelProfiles[model] ?? "사용자 선택";
+  bulkModelHelp.textContent = modelHelps[model] ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
 }
 
 function showJobProgress(token, title, detail) {
@@ -677,6 +1081,10 @@ function isCurrentCutoutRequest(requestId, file) {
 
 function isCurrentConvertRequest(requestId, file) {
   return requestId === convertRequestId && convertFile === file;
+}
+
+function isCurrentBulkRequest(requestId) {
+  return requestId === bulkRequestId;
 }
 
 function revokeObjectUrls() {

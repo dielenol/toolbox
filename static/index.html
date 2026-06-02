@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/assets/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="/static/assets/toolbox.png" />
     <link rel="apple-touch-icon" href="/static/assets/toolbox.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=10" />
+    <link rel="stylesheet" href="/static/styles.css?v=11" />
   </head>
   <body>
     <header class="topbar">
@@ -23,6 +23,7 @@
 
     <nav class="app-tabs" aria-label="작업 선택">
       <button type="button" class="tab-button active" data-view-target="cutout">누끼</button>
+      <button type="button" class="tab-button" data-view-target="bulk">벌크누끼</button>
       <button type="button" class="tab-button" data-view-target="convert">파일 변환</button>
     </nav>
 
@@ -198,6 +199,158 @@
       </section>
     </main>
 
+    <main class="workspace workspace-view" id="bulkWorkspace" data-view="bulk" hidden>
+      <aside class="control-panel" aria-label="벌크누끼 옵션">
+        <label class="dropzone" id="bulkDropzone">
+          <input
+            id="bulkFileInput"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff"
+            multiple
+          />
+          <span class="drop-title">이미지 여러 장 선택</span>
+          <span class="drop-meta" id="bulkFileMeta">PNG, JPG, WebP, BMP, TIFF</span>
+        </label>
+
+        <section class="control-group" aria-labelledby="bulkModelLabel">
+          <div class="group-head">
+            <h2 id="bulkModelLabel">모델</h2>
+            <span id="bulkModelProfile">최고 품질</span>
+          </div>
+          <select id="bulkModelSelect" aria-label="벌크누끼 모델 선택">
+            <option value="birefnet-hq" selected>BiRefNet HQ</option>
+            <option value="isnet-general-use">ISNet General</option>
+            <option value="u2net">U2-Net</option>
+            <option value="u2netp">U2-Netp</option>
+            <option value="u2net_human_seg">Human Segmentation</option>
+            <option value="isnet-anime">ISNet Anime</option>
+          </select>
+          <p class="helper-text" id="bulkModelHelp">
+            가장 정밀한 모델입니다. 여러 장을 처리할 때는 처리 시간이 길어질 수 있습니다.
+          </p>
+        </section>
+
+        <section class="control-group" aria-labelledby="bulkQualityLabel">
+          <div class="group-head">
+            <h2 id="bulkQualityLabel">품질</h2>
+            <span id="bulkQualityMode">Ultra</span>
+          </div>
+          <div class="segmented" role="group" aria-label="벌크누끼 품질 프리셋">
+            <button type="button" class="segment bulk-segment active" data-bulk-preset="ultra">Ultra</button>
+            <button type="button" class="segment bulk-segment" data-bulk-preset="studio">Studio</button>
+            <button type="button" class="segment bulk-segment" data-bulk-preset="balanced">Balanced</button>
+            <button type="button" class="segment bulk-segment" data-bulk-preset="fast">Fast</button>
+          </div>
+          <p class="helper-text" id="bulkPresetHelp">
+            가장 정밀하게 따는 설정입니다. 느리지만 복잡한 경계에 유리합니다.
+          </p>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>머리카락/반투명 보정</strong>
+              <small>얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.</small>
+            </span>
+            <input id="bulkAlphaMatting" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>마스크 정리</strong>
+              <small>배경에 남은 점이나 작은 구멍을 정리합니다. 얇은 선이 사라지면 꺼보세요.</small>
+            </span>
+            <input id="bulkPostProcess" type="checkbox" checked />
+          </label>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>테두리 색 번짐 제거</strong>
+              <small>기존 배경색이 가장자리에 묻는 현상을 줄입니다.</small>
+            </span>
+            <input id="bulkForegroundRefine" type="checkbox" checked />
+          </label>
+        </section>
+
+        <section class="control-group" aria-labelledby="bulkEdgeLabel">
+          <div class="group-head">
+            <h2 id="bulkEdgeLabel">엣지</h2>
+            <span id="bulkEdgeValue">0.1px</span>
+          </div>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>부드럽게</strong>
+              <small id="bulkFeatherHelp">낮음: 경계를 선명하게 유지합니다.</small>
+            </span>
+            <input id="bulkEdgeFeather" type="range" min="0" max="2" step="0.1" value="0.1" />
+          </label>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>안쪽으로 줄이기</strong>
+              <small id="bulkErodeHelp">약함: 원래 윤곽을 거의 그대로 둡니다.</small>
+            </span>
+            <input id="bulkErodeSize" type="range" min="0" max="20" step="1" value="4" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-labelledby="bulkThresholdLabel">
+          <div class="group-head">
+            <h2 id="bulkThresholdLabel">임계값</h2>
+            <span id="bulkThresholdValue">240 / 10</span>
+          </div>
+          <p class="helper-text">Alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 건드리지 않아도 됩니다.</p>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>피사체 확신</strong>
+              <small id="bulkForegroundHelp">높음: 확실한 피사체만 또렷하게 잡습니다.</small>
+            </span>
+            <input id="bulkForegroundThreshold" type="range" min="1" max="255" step="1" value="240" />
+          </label>
+          <label class="range-row">
+            <span class="label-stack">
+              <strong>배경 확신</strong>
+              <small id="bulkBackgroundHelp">낮음: 배경으로 확실한 부분만 제거합니다.</small>
+            </span>
+            <input id="bulkBackgroundThreshold" type="range" min="0" max="254" step="1" value="10" />
+          </label>
+        </section>
+
+        <div class="action-row" id="bulkActionRow">
+          <button type="button" class="primary-button" id="bulkProcessButton" disabled>벌크 누끼</button>
+          <button type="button" class="ghost-button" id="bulkSaveButton" disabled>ZIP 저장</button>
+          <button type="button" class="ghost-button" id="bulkClearButton" disabled>비우기</button>
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="벌크누끼 작업 현황">
+        <div class="stage-toolbar">
+          <div>
+            <h2 id="bulkStageTitle">벌크 작업 대기</h2>
+            <p id="bulkStageMeta">여러 이미지를 선택하면 파일별 처리 상태가 표시됩니다.</p>
+          </div>
+          <div class="result-meta" id="bulkResultMeta">-</div>
+        </div>
+
+        <div class="bulk-summary-grid" aria-label="벌크누끼 요약">
+          <div class="bulk-summary-item">
+            <span>전체</span>
+            <strong id="bulkTotalCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>완료</span>
+            <strong id="bulkDoneCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>실패</span>
+            <strong id="bulkFailCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>ZIP</span>
+            <strong id="bulkArchiveSize">-</strong>
+          </div>
+        </div>
+
+        <div class="bulk-list" id="bulkQueueList" aria-live="polite">
+          <div class="bulk-empty">처리할 이미지를 선택하세요.</div>
+        </div>
+      </section>
+    </main>
+
     <main class="workspace workspace-view" id="convertWorkspace" data-view="convert" hidden>
       <aside class="control-panel" aria-label="변환 옵션">
         <label class="dropzone" id="convertDropzone">
@@ -321,6 +474,16 @@
       </div>
     </div>
 
+    <div class="floating-actions" id="bulkFloatingActions" hidden>
+      <div class="floating-actions__content">
+        <span>벌크누끼</span>
+        <div class="floating-actions__buttons">
+          <button type="button" class="primary-button" id="floatingBulkProcessButton" disabled>벌크 누끼</button>
+          <button type="button" class="ghost-button" id="floatingBulkSaveButton" disabled>ZIP 저장</button>
+        </div>
+      </div>
+    </div>
+
     <div class="floating-actions" id="convertFloatingActions" hidden>
       <div class="floating-actions__content">
         <span>파일 변환</span>
@@ -331,6 +494,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=11" type="module"></script>
+    <script src="/static/app.js?v=12" type="module"></script>
   </body>
 </html>

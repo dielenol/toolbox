@@ -682,6 +682,113 @@ select {
   display: none;
 }
 
+.bulk-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bulk-summary-item {
+  display: grid;
+  gap: 4px;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefb;
+}
+
+.bulk-summary-item span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.bulk-summary-item strong {
+  color: var(--ink);
+  font-size: 1.2rem;
+}
+
+.bulk-list {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.bulk-empty {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  color: rgba(31, 42, 46, 0.45);
+  font-weight: 800;
+}
+
+.bulk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bulk-row:last-child {
+  border-bottom: 0;
+}
+
+.bulk-row strong {
+  display: block;
+  margin-bottom: 3px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.bulk-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bulk-row.processing .bulk-status {
+  color: var(--teal-dark);
+  border-color: rgba(47, 116, 114, 0.35);
+  background: rgba(47, 116, 114, 0.1);
+}
+
+.bulk-row.done .bulk-status {
+  color: var(--teal-dark);
+  border-color: rgba(47, 116, 114, 0.35);
+  background: rgba(47, 116, 114, 0.1);
+}
+
+.bulk-row.failed .bulk-status {
+  color: #8f341e;
+  border-color: rgba(198, 90, 58, 0.35);
+  background: rgba(198, 90, 58, 0.1);
+}
+
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;
@@ -710,6 +817,10 @@ select {
 
   .preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .bulk-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   body.has-floating-actions {

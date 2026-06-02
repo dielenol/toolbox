@@ -34,6 +34,11 @@ export function buildCutoutWebpName(name) {
   return `${stem}-cutout.webp`;
 }
 
+export function buildBulkArchiveName() {
+  const date = new Date().toISOString().slice(0, 10);
+  return `toolbox-cutouts-${date}.zip`;
+}
+
 export function buildConvertedName(name, format) {
   const stem = name.replace(/\.[^.]+$/, "") || "converted";
   const extension = format === "jpeg" ? "jpg" : format;
