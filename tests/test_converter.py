@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import unittest
 from io import BytesIO
+from zipfile import ZipFile
 
 from PIL import Image
 
 from app.converter import ConvertOptions, convert_image, parse_ico_sizes
+from app.main import _build_zip_archive
 
 
 def make_png(width: int = 32, height: int = 24) -> bytes:
@@ -41,6 +43,17 @@ class ConverterTests(unittest.TestCase):
     def test_rejects_unsupported_ico_size(self) -> None:
         with self.assertRaisesRegex(ValueError, "ICO 크기"):
             parse_ico_sizes("16,512")
+
+    def test_builds_archive_with_duplicate_names(self) -> None:
+        archive = _build_zip_archive(
+            [
+                ("sample-cutout.png", b"first"),
+                ("sample-cutout.png", b"second"),
+            ]
+        )
+
+        with ZipFile(BytesIO(archive)) as zip_file:
+            self.assertEqual(zip_file.namelist(), ["sample-cutout.png", "sample-cutout-2.png"])
 
 
 if __name__ == "__main__":

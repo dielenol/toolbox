@@ -10,6 +10,7 @@ SAVE_FILE_TYPES = {
     "bmp": ("BMP 이미지", ".bmp", "*.bmp"),
     "tiff": ("TIFF 이미지", ".tiff", "*.tif;*.tiff"),
     "ico": ("ICO 아이콘", ".ico", "*.ico"),
+    "zip": ("ZIP 압축 파일", ".zip", "*.zip"),
 }
 
 

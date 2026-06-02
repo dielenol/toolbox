@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -166,6 +168,31 @@ async def save_endpoint(
     return {"saved": True}
 
 
+@app.post("/api/archive")
+async def archive_endpoint(
+    files: list[UploadFile] = File(...),
+    archive_name: str = Form("toolbox-cutouts.zip"),
+) -> Response:
+    if not files:
+        raise HTTPException(status_code=400, detail="압축할 파일이 없습니다.")
+
+    entries: list[tuple[str, bytes]] = []
+    for file in files:
+        contents = await _read_upload(file)
+        entries.append((_zip_entry_filename(file.filename), contents))
+
+    archive = await run_in_threadpool(_build_zip_archive, entries)
+    filename = _archive_filename(archive_name)
+    return Response(
+        content=archive,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": _content_disposition(filename),
+            "X-Archive-Count": str(len(entries)),
+        },
+    )
+
+
 @app.post("/api/convert")
 async def convert_endpoint(
     file: UploadFile = File(...),
@@ -243,6 +270,44 @@ def _converted_filename(filename: str | None, output_format: str) -> str:
     if not safe:
         safe = "converted"
     return f"{safe}.{extension}"
+
+
+def _archive_filename(filename: str | None) -> str:
+    if not filename:
+        return "toolbox-cutouts.zip"
+    stem = Path(filename).stem or "toolbox-cutouts"
+    safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "-" for ch in stem).strip("-")
+    return f"{safe or 'toolbox-cutouts'}.zip"
+
+
+def _zip_entry_filename(filename: str | None) -> str:
+    if not filename:
+        return "cutout.png"
+    name = Path(filename.replace("\\", "/")).name.replace("\x00", "")
+    stem = Path(name).stem or "cutout"
+    suffix = Path(name).suffix.lower() or ".png"
+    safe_stem = "".join(ch if ch.isalnum() or ch in ("-", "_") else "-" for ch in stem).strip("-")
+    safe_suffix = suffix if suffix in (".png", ".webp", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".ico") else ".png"
+    return f"{safe_stem or 'cutout'}{safe_suffix}"
+
+
+def _build_zip_archive(entries: list[tuple[str, bytes]]) -> bytes:
+    buffer = BytesIO()
+    used_names: dict[str, int] = {}
+    with ZipFile(buffer, mode="w", compression=ZIP_DEFLATED) as archive:
+        for filename, contents in entries:
+            archive.writestr(_dedupe_filename(filename, used_names), contents)
+    return buffer.getvalue()
+
+
+def _dedupe_filename(filename: str, used_names: dict[str, int]) -> str:
+    normalized = filename or "cutout.png"
+    count = used_names.get(normalized, 0)
+    used_names[normalized] = count + 1
+    if count == 0:
+        return normalized
+    path = Path(normalized)
+    return f"{path.stem}-{count + 1}{path.suffix}"
 
 
 def _content_disposition(filename: str) -> str:
