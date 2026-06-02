@@ -56,6 +56,7 @@ select {
 
 .app-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   width: min(1500px, 100%);
   margin: 0 auto;

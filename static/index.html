@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/assets/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" href="/static/assets/toolbox.png" />
     <link rel="apple-touch-icon" href="/static/assets/toolbox.png" />
-    <link rel="stylesheet" href="/static/styles.css?v=11" />
+    <link rel="stylesheet" href="/static/styles.css?v=12" />
   </head>
   <body>
     <header class="topbar">
@@ -24,6 +24,7 @@
     <nav class="app-tabs" aria-label="작업 선택">
       <button type="button" class="tab-button active" data-view-target="cutout">누끼</button>
       <button type="button" class="tab-button" data-view-target="bulk">벌크누끼</button>
+      <button type="button" class="tab-button" data-view-target="webp">WebP 최적화</button>
       <button type="button" class="tab-button" data-view-target="convert">파일 변환</button>
     </nav>
 
@@ -351,6 +352,96 @@
       </section>
     </main>
 
+    <main class="workspace workspace-view" id="webpWorkspace" data-view="webp" hidden>
+      <aside class="control-panel" aria-label="WebP 최적화 옵션">
+        <label class="dropzone" id="webpDropzone">
+          <input
+            id="webpFileInput"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff"
+            multiple
+          />
+          <span class="drop-title">이미지 선택</span>
+          <span class="drop-meta" id="webpFileMeta">PNG, JPG, WebP, BMP, TIFF</span>
+        </label>
+
+        <section class="control-group" aria-labelledby="webpModeLabel">
+          <div class="group-head">
+            <h2 id="webpModeLabel">최적화</h2>
+            <span id="webpModeValue">표준</span>
+          </div>
+          <label class="toggle-row">
+            <span class="label-stack">
+              <strong>무손실 WebP</strong>
+              <small>투명도와 픽셀 정보를 보존합니다. 파일 크기는 표준 압축보다 커질 수 있습니다.</small>
+            </span>
+            <input id="webpLossless" type="checkbox" />
+          </label>
+          <label class="range-row" id="webpQualityRow">
+            <span class="label-stack">
+              <strong>품질</strong>
+              <small>값이 높을수록 원본에 가깝고 파일 크기가 커집니다.</small>
+            </span>
+            <input id="webpQuality" type="range" min="1" max="100" step="1" value="92" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-labelledby="webpSizeLabel">
+          <div class="group-head">
+            <h2 id="webpSizeLabel">출력 크기</h2>
+            <span id="webpSizeValue">원본</span>
+          </div>
+          <select id="webpMaxSize" aria-label="WebP 출력 최대 크기 선택">
+            <option value="0" selected>원본 유지</option>
+            <option value="512">최대 512px</option>
+            <option value="1024">최대 1024px</option>
+            <option value="1920">최대 1920px</option>
+            <option value="2048">최대 2048px</option>
+          </select>
+          <p class="helper-text">긴 변 기준으로 줄여 저장합니다. 원본보다 작은 이미지는 키우지 않습니다.</p>
+        </section>
+
+        <div class="action-row" id="webpActionRow">
+          <button type="button" class="primary-button" id="webpOptimizeButton" disabled>WebP 최적화</button>
+          <button type="button" class="ghost-button" id="webpSaveButton" disabled>결과 저장</button>
+          <button type="button" class="ghost-button" id="webpClearButton" disabled>비우기</button>
+        </div>
+      </aside>
+
+      <section class="stage" aria-label="WebP 최적화 작업 현황">
+        <div class="stage-toolbar">
+          <div>
+            <h2 id="webpStageTitle">WebP 최적화 대기</h2>
+            <p id="webpStageMeta">한 장 또는 여러 이미지를 선택하면 WebP 결과가 준비됩니다.</p>
+          </div>
+          <div class="result-meta" id="webpResultMeta">-</div>
+        </div>
+
+        <div class="bulk-summary-grid" aria-label="WebP 최적화 요약">
+          <div class="bulk-summary-item">
+            <span>전체</span>
+            <strong id="webpTotalCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>완료</span>
+            <strong id="webpDoneCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>실패</span>
+            <strong id="webpFailCount">0</strong>
+          </div>
+          <div class="bulk-summary-item">
+            <span>결과</span>
+            <strong id="webpOutputSize">-</strong>
+          </div>
+        </div>
+
+        <div class="bulk-list" id="webpQueueList" aria-live="polite">
+          <div class="bulk-empty">최적화할 이미지를 선택하세요.</div>
+        </div>
+      </section>
+    </main>
+
     <main class="workspace workspace-view" id="convertWorkspace" data-view="convert" hidden>
       <aside class="control-panel" aria-label="변환 옵션">
         <label class="dropzone" id="convertDropzone">
@@ -484,6 +575,16 @@
       </div>
     </div>
 
+    <div class="floating-actions" id="webpFloatingActions" hidden>
+      <div class="floating-actions__content">
+        <span>WebP 최적화</span>
+        <div class="floating-actions__buttons">
+          <button type="button" class="primary-button" id="floatingWebpOptimizeButton" disabled>WebP 최적화</button>
+          <button type="button" class="ghost-button" id="floatingWebpSaveButton" disabled>결과 저장</button>
+        </div>
+      </div>
+    </div>
+
     <div class="floating-actions" id="convertFloatingActions" hidden>
       <div class="floating-actions__content">
         <span>파일 변환</span>
@@ -494,6 +595,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=12" type="module"></script>
+    <script src="/static/app.js?v=13" type="module"></script>
   </body>
 </html>

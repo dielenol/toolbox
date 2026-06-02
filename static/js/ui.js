@@ -1,7 +1,12 @@
 import { el } from "./elements.js";
 
 export function showPageDropOverlay(view) {
-  el.pageDropText.textContent = view === "convert" ? "변환 탭에 파일 놓기" : "누끼 탭에 이미지 놓기";
+  const labels = {
+    bulk: "벌크누끼 탭에 이미지 놓기",
+    convert: "변환 탭에 파일 놓기",
+    webp: "WebP 최적화 탭에 이미지 놓기",
+  };
+  el.pageDropText.textContent = labels[view] ?? "누끼 탭에 이미지 놓기";
   el.pageDropOverlay.classList.add("visible");
 }
 

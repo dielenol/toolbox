@@ -5,6 +5,7 @@ import {
   buildConvertedName,
   buildCutoutName,
   buildCutoutWebpName,
+  buildWebpArchiveName,
   capitalize,
   describeBackground,
   describeErode,
@@ -103,6 +104,30 @@ const {
   bulkFailCount,
   bulkTotalCount,
   bulkArchiveSize,
+  webpFileInput,
+  webpDropzone,
+  webpFileMeta,
+  webpActionRow,
+  webpOptimizeButton,
+  webpSaveButton,
+  webpClearButton,
+  webpFloatingActions,
+  floatingWebpOptimizeButton,
+  floatingWebpSaveButton,
+  webpLossless,
+  webpModeValue,
+  webpQuality,
+  webpQualityRow,
+  webpMaxSize,
+  webpSizeValue,
+  webpStageTitle,
+  webpStageMeta,
+  webpResultMeta,
+  webpQueueList,
+  webpDoneCount,
+  webpFailCount,
+  webpTotalCount,
+  webpOutputSize,
   convertFileInput,
   convertDropzone,
   convertFileMeta,
@@ -146,6 +171,10 @@ let convertResultFormat = null;
 let bulkItems = [];
 let bulkArchiveBlob = null;
 let bulkArchiveName = buildBulkArchiveName();
+let webpItems = [];
+let webpOutputBlob = null;
+let webpOutputName = buildWebpArchiveName();
+let webpOutputFormat = "zip";
 let pageDragDepth = 0;
 let cutoutRequestId = 0;
 let activeCutoutRequestId = 0;
@@ -153,6 +182,8 @@ let convertRequestId = 0;
 let activeConvertRequestId = 0;
 let bulkRequestId = 0;
 let activeBulkRequestId = 0;
+let webpRequestId = 0;
+let activeWebpRequestId = 0;
 let activeProgressToken = null;
 
 init();
@@ -163,9 +194,11 @@ function init() {
   bindFloatingActions();
   bindCutoutEvents();
   bindBulkEvents();
+  bindWebpEvents();
   bindConvertEvents();
   applyPreset("ultra");
   applyBulkPreset("ultra");
+  updateWebpControls();
   updateConvertControls();
   checkApi();
   syncFloatingActions();
@@ -216,6 +249,8 @@ function bindFloatingActions() {
   floatingWebpButton.addEventListener("click", () => webpDownloadButton.click());
   floatingBulkProcessButton.addEventListener("click", () => bulkProcessButton.click());
   floatingBulkSaveButton.addEventListener("click", () => bulkSaveButton.click());
+  floatingWebpOptimizeButton.addEventListener("click", () => webpOptimizeButton.click());
+  floatingWebpSaveButton.addEventListener("click", () => webpSaveButton.click());
   floatingConvertButton.addEventListener("click", () => convertButton.click());
   floatingConvertDownloadButton.addEventListener("click", () => convertDownloadButton.click());
 
@@ -224,6 +259,7 @@ function bindFloatingActions() {
   });
   observer.observe(cutoutActionRow);
   observer.observe(bulkActionRow);
+  observer.observe(webpActionRow);
   observer.observe(convertActionRow);
 
   window.addEventListener("scroll", () => requestAnimationFrame(syncFloatingActions), { passive: true });
@@ -249,26 +285,37 @@ function syncFloatingActions() {
   const activeView = getActiveView();
   const cutoutHasWork = Boolean(selectedFile || resultBlob);
   const bulkHasWork = bulkItems.length > 0 || Boolean(bulkArchiveBlob);
+  const webpHasWork = webpItems.length > 0 || Boolean(webpOutputBlob);
   const convertHasWork = Boolean(convertFile || convertResultUrl);
   const cutoutShouldFloat = activeView === "cutout" && cutoutHasWork && !isActionRowVisible(cutoutActionRow);
   const bulkShouldFloat = activeView === "bulk" && bulkHasWork && !isActionRowVisible(bulkActionRow);
+  const webpShouldFloat = activeView === "webp" && webpHasWork && !isActionRowVisible(webpActionRow);
   const convertShouldFloat = activeView === "convert" && convertHasWork && !isActionRowVisible(convertActionRow);
 
   cutoutFloatingActions.hidden = !cutoutShouldFloat;
   bulkFloatingActions.hidden = !bulkShouldFloat;
+  webpFloatingActions.hidden = !webpShouldFloat;
   convertFloatingActions.hidden = !convertShouldFloat;
-  document.body.classList.toggle("has-floating-actions", cutoutShouldFloat || bulkShouldFloat || convertShouldFloat);
+  document.body.classList.toggle(
+    "has-floating-actions",
+    cutoutShouldFloat || bulkShouldFloat || webpShouldFloat || convertShouldFloat,
+  );
 
   floatingProcessButton.disabled = processButton.disabled;
   floatingDownloadButton.disabled = isDisabledDownload(downloadButton);
   floatingWebpButton.disabled = webpDownloadButton.disabled;
   floatingBulkProcessButton.disabled = bulkProcessButton.disabled;
   floatingBulkSaveButton.disabled = bulkSaveButton.disabled;
+  floatingWebpOptimizeButton.disabled = webpOptimizeButton.disabled;
+  floatingWebpSaveButton.disabled = webpSaveButton.disabled;
   floatingConvertButton.disabled = convertButton.disabled;
   floatingConvertDownloadButton.disabled = isDisabledDownload(convertDownloadButton);
   mirrorActionState(floatingProcessButton, processButton);
   mirrorActionState(floatingWebpButton, webpDownloadButton);
   mirrorActionState(floatingBulkProcessButton, bulkProcessButton);
+  mirrorActionState(floatingBulkSaveButton, bulkSaveButton);
+  mirrorActionState(floatingWebpOptimizeButton, webpOptimizeButton);
+  mirrorActionState(floatingWebpSaveButton, webpSaveButton);
   mirrorActionState(floatingConvertButton, convertButton);
 }
 
@@ -310,6 +357,16 @@ function bindBulkEvents() {
   bulkClearButton.addEventListener("click", clearBulkFiles);
 }
 
+function bindWebpEvents() {
+  bindWebpFilePicker();
+  webpLossless.addEventListener("change", updateWebpControls);
+  webpQuality.addEventListener("input", updateWebpControls);
+  webpMaxSize.addEventListener("change", updateWebpControls);
+  webpOptimizeButton.addEventListener("click", processWebpImages);
+  webpSaveButton.addEventListener("click", saveWebpOutput);
+  webpClearButton.addEventListener("click", clearWebpFiles);
+}
+
 function bindConvertEvents() {
   bindFilePicker(convertFileInput, convertDropzone, setConvertFile);
   convertFormat.addEventListener("change", updateConvertControls);
@@ -348,6 +405,32 @@ function bindBulkFilePicker() {
   });
 }
 
+function bindWebpFilePicker() {
+  webpFileInput.addEventListener("change", () => {
+    const files = Array.from(webpFileInput.files || []);
+    if (files.length) setWebpFiles(files);
+  });
+
+  for (const eventName of ["dragenter", "dragover"]) {
+    webpDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      webpDropzone.classList.add("dragging");
+    });
+  }
+
+  for (const eventName of ["dragleave", "drop"]) {
+    webpDropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      webpDropzone.classList.remove("dragging");
+    });
+  }
+
+  webpDropzone.addEventListener("drop", (event) => {
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length) setWebpFiles(files);
+  });
+}
+
 function bindFilePicker(input, zone, onFile) {
   input.addEventListener("change", () => {
     const [file] = input.files;
@@ -383,13 +466,18 @@ function useDroppedFiles(files) {
         ? "변환 탭은 PNG, JPG, WebP, BMP, TIFF, ICO 파일을 지원합니다."
         : view === "bulk"
           ? "벌크누끼 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다."
-        : "누끼 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다.";
+          : view === "webp"
+            ? "WebP 최적화 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다."
+            : "누끼 탭은 PNG, JPG, WebP, BMP, TIFF 파일을 지원합니다.";
     if (view === "convert") {
       convertStageTitle.textContent = "파일 확인 필요";
       convertStageMeta.textContent = message;
     } else if (view === "bulk") {
       bulkStageTitle.textContent = "파일 확인 필요";
       bulkStageMeta.textContent = message;
+    } else if (view === "webp") {
+      webpStageTitle.textContent = "파일 확인 필요";
+      webpStageMeta.textContent = message;
     } else {
       stageTitle.textContent = "파일 확인 필요";
       stageMeta.textContent = message;
@@ -401,6 +489,8 @@ function useDroppedFiles(files) {
     setConvertFile(supportedFiles[0]);
   } else if (view === "bulk") {
     setBulkFiles(supportedFiles);
+  } else if (view === "webp") {
+    setWebpFiles(supportedFiles);
   } else {
     setFile(supportedFiles[0]);
   }
@@ -830,6 +920,246 @@ function updateBulkSummary() {
     : "PNG, JPG, WebP, BMP, TIFF";
 }
 
+function setWebpFiles(files) {
+  const supportedFiles = files.filter((file) => isSupportedForView(file, "webp"));
+  const rejectedCount = files.length - supportedFiles.length;
+  webpRequestId += 1;
+  webpOutputBlob = null;
+  webpOutputName = buildWebpArchiveName();
+  webpOutputFormat = "zip";
+  webpItems = supportedFiles.map((file) => ({
+    file,
+    status: "ready",
+    statusLabel: "대기",
+    detail: formatBytes(file.size),
+    result: null,
+  }));
+
+  webpOptimizeButton.disabled = webpItems.length === 0;
+  webpSaveButton.disabled = true;
+  webpClearButton.disabled = webpItems.length === 0;
+  webpStageTitle.textContent = webpItems.length ? "파일 준비됨" : "파일 확인 필요";
+  webpStageMeta.textContent = rejectedCount
+    ? `${webpItems.length}개 선택됨 · 지원하지 않는 파일 ${rejectedCount}개 제외`
+    : `${webpItems.length}개 선택됨`;
+  webpResultMeta.textContent = "-";
+  webpOutputSize.textContent = "-";
+  renderWebpQueue();
+  syncFloatingActions();
+}
+
+async function processWebpImages() {
+  if (!webpItems.length) return;
+
+  const requestId = webpRequestId + 1;
+  const progressToken = `webp-${requestId}`;
+  const options = getWebpOptions();
+  const results = [];
+  webpRequestId = requestId;
+  activeWebpRequestId = requestId;
+  webpOutputBlob = null;
+  webpOutputName = webpItems.length === 1 ? buildConvertedName(webpItems[0].file.name, "webp") : buildWebpArchiveName();
+  webpOutputFormat = webpItems.length === 1 ? "webp" : "zip";
+  webpSaveButton.disabled = true;
+  webpOutputSize.textContent = "-";
+  webpItems = webpItems.map((item) => ({
+    ...item,
+    status: "ready",
+    statusLabel: "대기",
+    detail: formatBytes(item.file.size),
+    result: null,
+  }));
+
+  setButtonBusy(webpOptimizeButton, true, "처리 중");
+  webpClearButton.disabled = true;
+  webpStageTitle.textContent = "WebP 최적화 중";
+  webpResultMeta.textContent = `0 / ${webpItems.length}`;
+  renderWebpQueue();
+  showJobProgress(progressToken, "WebP 최적화 중", `1 / ${webpItems.length} 이미지를 준비하고 있습니다.`);
+  syncFloatingActions();
+
+  try {
+    for (const [index, item] of webpItems.entries()) {
+      if (!isCurrentWebpRequest(requestId)) return;
+
+      item.status = "processing";
+      item.statusLabel = "처리 중";
+      item.detail = `${index + 1} / ${webpItems.length} · WebP 생성`;
+      webpResultMeta.textContent = `${index} / ${webpItems.length}`;
+      showJobProgress(progressToken, "WebP 최적화 중", `${index + 1} / ${webpItems.length} · ${item.file.name}`);
+      renderWebpQueue();
+
+      try {
+        const response = await convertFileToWebp(item.file, options);
+        const blob = await response.blob();
+        const width = response.headers.get("X-Image-Width");
+        const height = response.headers.get("X-Image-Height");
+        const elapsed = response.headers.get("X-Process-Time-Ms");
+        const filename = buildConvertedName(item.file.name, "webp");
+
+        item.status = "done";
+        item.statusLabel = "완료";
+        item.detail = [
+          width && height ? `${width} x ${height}` : null,
+          `${formatBytes(blob.size)}`,
+          elapsed ? `${Number(elapsed).toLocaleString()} ms` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        item.result = { blob, filename };
+        results.push(item.result);
+      } catch (error) {
+        item.status = "failed";
+        item.statusLabel = "실패";
+        item.detail = error.message;
+      }
+
+      webpResultMeta.textContent = `${index + 1} / ${webpItems.length}`;
+      renderWebpQueue();
+    }
+
+    if (!isCurrentWebpRequest(requestId)) return;
+
+    if (!results.length) {
+      webpStageTitle.textContent = "최적화 실패";
+      webpStageMeta.textContent = "저장할 수 있는 결과가 없습니다.";
+      webpResultMeta.textContent = "0개 완료";
+      return;
+    }
+
+    if (webpItems.length === 1 && results.length === 1) {
+      webpOutputBlob = results[0].blob;
+      webpOutputName = results[0].filename;
+      webpOutputFormat = "webp";
+      webpStageMeta.textContent = `${results[0].filename} 파일을 준비했습니다.`;
+    } else {
+      showJobProgress(progressToken, "ZIP 생성 중", `${results.length}개 WebP 결과를 ZIP으로 묶고 있습니다.`);
+      webpOutputName = buildWebpArchiveName();
+      webpOutputBlob = await createBulkArchive(results, webpOutputName);
+      webpOutputFormat = "zip";
+      webpStageMeta.textContent = `${results.length}개 WebP 결과를 ZIP으로 준비했습니다.`;
+    }
+
+    webpOutputSize.textContent = formatBytes(webpOutputBlob.size);
+    webpSaveButton.textContent = webpOutputFormat === "webp" ? "WebP 저장" : "ZIP 저장";
+    webpSaveButton.disabled = false;
+    webpStageTitle.textContent = "WebP 최적화 완료";
+    webpResultMeta.textContent = `${results.length}개 완료`;
+  } catch (error) {
+    if (!isCurrentWebpRequest(requestId)) return;
+    webpStageTitle.textContent = "WebP 최적화 실패";
+    webpStageMeta.textContent = error.message;
+    webpResultMeta.textContent = "오류";
+  } finally {
+    hideJobProgress(progressToken);
+    if (activeWebpRequestId === requestId) {
+      activeWebpRequestId = 0;
+      setButtonBusy(webpOptimizeButton, false, "WebP 최적화");
+      webpClearButton.disabled = webpItems.length === 0;
+    }
+    renderWebpQueue();
+    syncFloatingActions();
+  }
+}
+
+async function saveWebpOutput() {
+  if (!webpOutputBlob) return;
+
+  setButtonBusy(webpSaveButton, true, "저장 중");
+  try {
+    const saved = await saveBlobWithPicker(webpOutputBlob, webpOutputName, getSaveFileTypes(webpOutputFormat));
+    webpResultMeta.textContent = saved ? "저장 완료" : "저장 취소";
+  } catch (error) {
+    webpResultMeta.textContent = "저장 오류";
+    webpStageMeta.textContent = error.message;
+  } finally {
+    setButtonBusy(webpSaveButton, false, webpOutputFormat === "webp" ? "WebP 저장" : "ZIP 저장");
+    syncFloatingActions();
+  }
+}
+
+function clearWebpFiles() {
+  webpRequestId += 1;
+  webpItems = [];
+  webpOutputBlob = null;
+  webpOutputName = buildWebpArchiveName();
+  webpOutputFormat = "zip";
+  webpFileInput.value = "";
+  webpFileMeta.textContent = "PNG, JPG, WebP, BMP, TIFF";
+  webpOptimizeButton.disabled = true;
+  webpSaveButton.disabled = true;
+  webpSaveButton.textContent = "결과 저장";
+  webpClearButton.disabled = true;
+  webpStageTitle.textContent = "WebP 최적화 대기";
+  webpStageMeta.textContent = "한 장 또는 여러 이미지를 선택하면 WebP 결과가 준비됩니다.";
+  webpResultMeta.textContent = "-";
+  webpOutputSize.textContent = "-";
+  renderWebpQueue();
+  syncFloatingActions();
+}
+
+async function convertFileToWebp(file, options) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("output_format", "webp");
+  formData.append("quality", options.quality);
+  formData.append("webp_lossless", String(options.lossless));
+  formData.append("output_size", options.outputSize);
+
+  const response = await fetch("/api/convert", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `HTTP ${response.status}`);
+  }
+  return response;
+}
+
+function renderWebpQueue() {
+  updateWebpSummary();
+  webpQueueList.innerHTML = "";
+  if (!webpItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "bulk-empty";
+    empty.textContent = "최적화할 이미지를 선택하세요.";
+    webpQueueList.append(empty);
+    return;
+  }
+
+  webpItems.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = `bulk-row ${item.status}`;
+
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = item.file.name;
+    const detail = document.createElement("small");
+    detail.textContent = item.detail || formatBytes(item.file.size);
+    copy.append(name, detail);
+
+    const status = document.createElement("span");
+    status.className = "bulk-status";
+    status.textContent = item.statusLabel;
+
+    row.append(copy, status);
+    webpQueueList.append(row);
+  });
+}
+
+function updateWebpSummary() {
+  const done = webpItems.filter((item) => item.status === "done").length;
+  const failed = webpItems.filter((item) => item.status === "failed").length;
+  webpTotalCount.textContent = String(webpItems.length);
+  webpDoneCount.textContent = String(done);
+  webpFailCount.textContent = String(failed);
+  webpFileMeta.textContent = webpItems.length
+    ? `${webpItems.length}개 · ${formatBytes(webpItems.reduce((sum, item) => sum + item.file.size, 0))}`
+    : "PNG, JPG, WebP, BMP, TIFF";
+}
+
 function setConvertFile(file) {
   convertRequestId += 1;
   convertFile = file;
@@ -988,6 +1318,22 @@ function getBulkRemoveOptions() {
   };
 }
 
+function getWebpOptions() {
+  return {
+    lossless: webpLossless.checked,
+    quality: webpQuality.value,
+    outputSize: webpMaxSize.value,
+  };
+}
+
+function updateWebpControls() {
+  const lossless = webpLossless.checked;
+  webpModeValue.textContent = lossless ? "무손실" : `${webpQuality.value}`;
+  webpQuality.disabled = lossless;
+  webpQualityRow.classList.toggle("control-disabled", lossless);
+  webpSizeValue.textContent = webpMaxSize.value === "0" ? "원본" : `${webpMaxSize.value}px`;
+}
+
 function updateConvertControls() {
   const format = convertFormat.value;
   const qualityEnabled = ["jpg", "webp"].includes(format);
@@ -1085,6 +1431,10 @@ function isCurrentConvertRequest(requestId, file) {
 
 function isCurrentBulkRequest(requestId) {
   return requestId === bulkRequestId;
+}
+
+function isCurrentWebpRequest(requestId) {
+  return requestId === webpRequestId;
 }
 
 function revokeObjectUrls() {
