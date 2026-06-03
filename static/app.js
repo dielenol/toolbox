@@ -678,13 +678,8 @@ function setBulkFiles(files) {
   bulkRequestId += 1;
   bulkArchiveBlob = null;
   bulkArchiveName = buildBulkArchiveName();
-  bulkItems = supportedFiles.map((file) => ({
-    file,
-    status: "ready",
-    statusLabel: "대기",
-    detail: formatBytes(file.size),
-    result: null,
-  }));
+  releaseBatchItemUrls(bulkItems);
+  bulkItems = supportedFiles.map(createBatchItem);
 
   bulkProcessButton.disabled = bulkItems.length === 0;
   bulkSaveButton.disabled = true;
@@ -692,7 +687,7 @@ function setBulkFiles(files) {
   bulkStageTitle.textContent = bulkItems.length ? "파일 준비됨" : "파일 확인 필요";
   bulkStageMeta.textContent = rejectedCount
     ? `${bulkItems.length}개 선택됨 · 지원하지 않는 파일 ${rejectedCount}개 제외`
-    : `${bulkItems.length}개 선택됨`;
+    : `${bulkItems.length}개 선택됨 · 원본 미리보기가 보드에 표시됩니다.`;
   bulkResultMeta.textContent = "-";
   bulkArchiveSize.textContent = "-";
   renderBulkQueue();
@@ -712,12 +707,14 @@ async function processBulkImages() {
   bulkArchiveName = buildBulkArchiveName();
   bulkSaveButton.disabled = true;
   bulkArchiveSize.textContent = "-";
+  releaseBatchResultUrls(bulkItems);
   bulkItems = bulkItems.map((item) => ({
     ...item,
     status: "ready",
     statusLabel: "대기",
     detail: formatBytes(item.file.size),
     result: null,
+    resultUrl: null,
   }));
 
   setButtonBusy(bulkProcessButton, true, "처리 중");
@@ -742,6 +739,7 @@ async function processBulkImages() {
       try {
         const response = await removeFile(item.file, options);
         const blob = await response.blob();
+        if (!isCurrentBulkRequest(requestId)) return;
         const width = response.headers.get("X-Image-Width");
         const height = response.headers.get("X-Image-Height");
         const elapsed = response.headers.get("X-Process-Time-Ms");
@@ -755,6 +753,7 @@ async function processBulkImages() {
         ]
           .filter(Boolean)
           .join(" · ");
+        item.resultUrl = URL.createObjectURL(blob);
         item.result = { blob, filename };
         results.push(item.result);
       } catch (error) {
@@ -818,6 +817,7 @@ async function saveBulkArchive() {
 
 function clearBulkFiles() {
   bulkRequestId += 1;
+  releaseBatchItemUrls(bulkItems);
   bulkItems = [];
   bulkArchiveBlob = null;
   bulkArchiveName = buildBulkArchiveName();
@@ -1051,6 +1051,194 @@ function concatBytes(...parts) {
   return output;
 }
 
+function createBatchItem(file) {
+  return {
+    file,
+    previewUrl: URL.createObjectURL(file),
+    resultUrl: null,
+    status: "ready",
+    statusLabel: "대기",
+    detail: formatBytes(file.size),
+    result: null,
+  };
+}
+
+function releaseBatchItemUrls(items) {
+  items.forEach((item) => {
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+      item.previewUrl = null;
+    }
+    if (item.resultUrl) {
+      URL.revokeObjectURL(item.resultUrl);
+      item.resultUrl = null;
+    }
+  });
+}
+
+function releaseBatchResultUrls(items) {
+  items.forEach((item) => {
+    if (item.resultUrl) {
+      URL.revokeObjectURL(item.resultUrl);
+      item.resultUrl = null;
+    }
+  });
+}
+
+function createBatchThumb(item) {
+  const thumb = document.createElement("span");
+  thumb.className = "bulk-thumb";
+
+  const imageUrl = item.resultUrl || item.previewUrl;
+  if (imageUrl) {
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = item.file.name;
+    image.loading = "lazy";
+    image.title = item.file.name;
+    thumb.append(image);
+  }
+
+  return thumb;
+}
+
+function getSummaryPreviewHost(counterElement) {
+  const card = counterElement.closest(".bulk-summary-item");
+  let host = card.querySelector(".summary-preview");
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "summary-preview";
+    card.append(host);
+  }
+  host.innerHTML = "";
+  return host;
+}
+
+function appendSummaryEmpty(host, text) {
+  const empty = document.createElement("div");
+  empty.className = "summary-empty";
+  empty.textContent = text;
+  host.append(empty);
+}
+
+function renderSummaryThumbs(counterElement, items, urlKey, emptyText) {
+  const host = getSummaryPreviewHost(counterElement);
+  const visibleItems = items.filter((item) => item[urlKey]);
+
+  if (!visibleItems.length) {
+    appendSummaryEmpty(host, emptyText);
+    return;
+  }
+
+  const strip = document.createElement("div");
+  strip.className = "summary-thumbs";
+  const limit = visibleItems.length > 8 ? 7 : 8;
+
+  visibleItems.slice(0, limit).forEach((item) => {
+    const thumb = document.createElement("span");
+    thumb.className = "summary-thumb";
+
+    const image = document.createElement("img");
+    image.src = item[urlKey];
+    image.alt = item.file.name;
+    image.loading = "lazy";
+    image.title = item.file.name;
+    thumb.append(image);
+    strip.append(thumb);
+  });
+
+  if (visibleItems.length > limit) {
+    const more = document.createElement("span");
+    more.className = "summary-more";
+    more.textContent = `+${visibleItems.length - limit}`;
+    strip.append(more);
+  }
+
+  host.append(strip);
+}
+
+function renderSummaryFailures(counterElement, failedItems) {
+  const host = getSummaryPreviewHost(counterElement);
+
+  if (!failedItems.length) {
+    appendSummaryEmpty(host, "실패한 파일이 여기에 표시됩니다.");
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "summary-file-list";
+  const limit = failedItems.length > 3 ? 2 : 3;
+
+  failedItems.slice(0, limit).forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "summary-file-row";
+
+    const name = document.createElement("strong");
+    name.textContent = item.file.name;
+    const detail = document.createElement("small");
+    detail.textContent = item.detail || "오류";
+    row.append(name, detail);
+    list.append(row);
+  });
+
+  if (failedItems.length > limit) {
+    const row = document.createElement("div");
+    row.className = "summary-file-row";
+    const name = document.createElement("strong");
+    name.textContent = `+${failedItems.length - limit}개 더`;
+    const detail = document.createElement("small");
+    detail.textContent = "아래 목록에서 전체 실패 파일을 확인하세요.";
+    row.append(name, detail);
+    list.append(row);
+  }
+
+  host.append(list);
+}
+
+function renderSummaryPackage(counterElement, blob, filename, label) {
+  const host = getSummaryPreviewHost(counterElement);
+
+  if (!blob) {
+    appendSummaryEmpty(host, "완료 후 저장 파일이 여기에 준비됩니다.");
+    return;
+  }
+
+  const packageInfo = document.createElement("div");
+  packageInfo.className = "summary-package";
+  const name = document.createElement("strong");
+  name.textContent = filename;
+  const detail = document.createElement("span");
+  detail.textContent = `${label} · ${formatBytes(blob.size)} · 저장 버튼으로 내려받기`;
+  packageInfo.append(name, detail);
+  host.append(packageInfo);
+}
+
+function updateBatchSummary({
+  items,
+  totalElement,
+  doneElement,
+  failElement,
+  packageElement,
+  packageBlob,
+  packageName,
+  packageLabel,
+  totalEmptyText,
+  doneEmptyText,
+}) {
+  const doneItems = items.filter((item) => item.status === "done");
+  const failedItems = items.filter((item) => item.status === "failed");
+
+  totalElement.textContent = String(items.length);
+  doneElement.textContent = String(doneItems.length);
+  failElement.textContent = String(failedItems.length);
+  packageElement.textContent = packageBlob ? formatBytes(packageBlob.size) : "-";
+
+  renderSummaryThumbs(totalElement, items, "previewUrl", totalEmptyText);
+  renderSummaryThumbs(doneElement, doneItems, "resultUrl", doneEmptyText);
+  renderSummaryFailures(failElement, failedItems);
+  renderSummaryPackage(packageElement, packageBlob, packageName, packageLabel);
+}
+
 function renderBulkQueue() {
   updateBulkSummary();
   bulkQueueList.innerHTML = "";
@@ -1065,6 +1253,7 @@ function renderBulkQueue() {
   bulkItems.forEach((item) => {
     const row = document.createElement("div");
     row.className = `bulk-row ${item.status}`;
+    const thumb = createBatchThumb(item);
 
     const copy = document.createElement("div");
     const name = document.createElement("strong");
@@ -1077,17 +1266,24 @@ function renderBulkQueue() {
     status.className = "bulk-status";
     status.textContent = item.statusLabel;
 
-    row.append(copy, status);
+    row.append(thumb, copy, status);
     bulkQueueList.append(row);
   });
 }
 
 function updateBulkSummary() {
-  const done = bulkItems.filter((item) => item.status === "done").length;
-  const failed = bulkItems.filter((item) => item.status === "failed").length;
-  bulkTotalCount.textContent = String(bulkItems.length);
-  bulkDoneCount.textContent = String(done);
-  bulkFailCount.textContent = String(failed);
+  updateBatchSummary({
+    items: bulkItems,
+    totalElement: bulkTotalCount,
+    doneElement: bulkDoneCount,
+    failElement: bulkFailCount,
+    packageElement: bulkArchiveSize,
+    packageBlob: bulkArchiveBlob,
+    packageName: bulkArchiveName,
+    packageLabel: "ZIP",
+    totalEmptyText: "선택한 원본 이미지가 여기에 표시됩니다.",
+    doneEmptyText: "완료된 누끼 결과가 여기에 표시됩니다.",
+  });
   bulkFileMeta.textContent = bulkItems.length
     ? `${bulkItems.length}개 · ${formatBytes(bulkItems.reduce((sum, item) => sum + item.file.size, 0))}`
     : "PNG, JPG, WebP, BMP, TIFF";
@@ -1100,13 +1296,8 @@ function setWebpFiles(files) {
   webpOutputBlob = null;
   webpOutputName = buildWebpArchiveName();
   webpOutputFormat = "zip";
-  webpItems = supportedFiles.map((file) => ({
-    file,
-    status: "ready",
-    statusLabel: "대기",
-    detail: formatBytes(file.size),
-    result: null,
-  }));
+  releaseBatchItemUrls(webpItems);
+  webpItems = supportedFiles.map(createBatchItem);
 
   webpOptimizeButton.disabled = webpItems.length === 0;
   webpSaveButton.disabled = true;
@@ -1114,7 +1305,7 @@ function setWebpFiles(files) {
   webpStageTitle.textContent = webpItems.length ? "파일 준비됨" : "파일 확인 필요";
   webpStageMeta.textContent = rejectedCount
     ? `${webpItems.length}개 선택됨 · 지원하지 않는 파일 ${rejectedCount}개 제외`
-    : `${webpItems.length}개 선택됨 · 최적화 후 저장 버튼으로 내려받습니다.`;
+    : `${webpItems.length}개 선택됨 · 원본 미리보기가 보드에 표시됩니다.`;
   webpResultMeta.textContent = "-";
   webpOutputSize.textContent = "-";
   renderWebpQueue();
@@ -1135,12 +1326,14 @@ async function processWebpImages() {
   webpOutputFormat = webpItems.length === 1 ? "webp" : "zip";
   webpSaveButton.disabled = true;
   webpOutputSize.textContent = "-";
+  releaseBatchResultUrls(webpItems);
   webpItems = webpItems.map((item) => ({
     ...item,
     status: "ready",
     statusLabel: "대기",
     detail: formatBytes(item.file.size),
     result: null,
+    resultUrl: null,
   }));
 
   setButtonBusy(webpOptimizeButton, true, "처리 중");
@@ -1165,6 +1358,7 @@ async function processWebpImages() {
       try {
         const response = await convertFileToWebp(item.file, options);
         const blob = await response.blob();
+        if (!isCurrentWebpRequest(requestId)) return;
         const width = response.headers.get("X-Image-Width");
         const height = response.headers.get("X-Image-Height");
         const elapsed = response.headers.get("X-Process-Time-Ms");
@@ -1179,6 +1373,7 @@ async function processWebpImages() {
         ]
           .filter(Boolean)
           .join(" · ");
+        item.resultUrl = URL.createObjectURL(blob);
         item.result = { blob, filename };
         results.push(item.result);
       } catch (error) {
@@ -1253,6 +1448,7 @@ async function saveWebpOutput() {
 
 function clearWebpFiles() {
   webpRequestId += 1;
+  releaseBatchItemUrls(webpItems);
   webpItems = [];
   webpOutputBlob = null;
   webpOutputName = buildWebpArchiveName();
@@ -1305,6 +1501,7 @@ function renderWebpQueue() {
   webpItems.forEach((item) => {
     const row = document.createElement("div");
     row.className = `bulk-row ${item.status}`;
+    const thumb = createBatchThumb(item);
 
     const copy = document.createElement("div");
     const name = document.createElement("strong");
@@ -1317,17 +1514,24 @@ function renderWebpQueue() {
     status.className = "bulk-status";
     status.textContent = item.statusLabel;
 
-    row.append(copy, status);
+    row.append(thumb, copy, status);
     webpQueueList.append(row);
   });
 }
 
 function updateWebpSummary() {
-  const done = webpItems.filter((item) => item.status === "done").length;
-  const failed = webpItems.filter((item) => item.status === "failed").length;
-  webpTotalCount.textContent = String(webpItems.length);
-  webpDoneCount.textContent = String(done);
-  webpFailCount.textContent = String(failed);
+  updateBatchSummary({
+    items: webpItems,
+    totalElement: webpTotalCount,
+    doneElement: webpDoneCount,
+    failElement: webpFailCount,
+    packageElement: webpOutputSize,
+    packageBlob: webpOutputBlob,
+    packageName: webpOutputName,
+    packageLabel: webpOutputFormat === "webp" ? "WebP" : "ZIP",
+    totalEmptyText: "선택한 원본 이미지가 여기에 표시됩니다.",
+    doneEmptyText: "최적화된 WebP 결과가 여기에 표시됩니다.",
+  });
   webpFileMeta.textContent = webpItems.length
     ? `${webpItems.length}개 · ${formatBytes(webpItems.reduce((sum, item) => sum + item.file.size, 0))}`
     : "PNG, JPG, WebP, BMP, TIFF";
@@ -1614,4 +1818,6 @@ function revokeObjectUrls() {
   for (const url of [originalUrl, resultUrl, convertOriginalUrl, convertResultUrl]) {
     if (url) URL.revokeObjectURL(url);
   }
+  releaseBatchItemUrls(bulkItems);
+  releaseBatchItemUrls(webpItems);
 }
