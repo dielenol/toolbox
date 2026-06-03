@@ -873,9 +873,182 @@ async function createBulkArchive(results, archiveName) {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.detail || `HTTP ${response.status}`);
+    const message = payload.detail || `HTTP ${response.status}`;
+    if (response.status === 404 || response.status === 405) {
+      console.warn("서버 ZIP API를 찾을 수 없어 브라우저에서 ZIP을 생성합니다.", message);
+      return createBrowserZip(results, archiveName);
+    }
+    throw new Error(message);
   }
   return response.blob();
+}
+
+async function createBrowserZip(results, archiveName) {
+  const encoder = new TextEncoder();
+  const now = new Date();
+  const { dosDate, dosTime } = toZipDosDateTime(now);
+  const chunks = [];
+  const centralDirectory = [];
+  const usedNames = new Set();
+  let offset = 0;
+
+  for (const [index, result] of results.entries()) {
+    const filename = dedupeZipName(sanitizeZipName(result.filename, index), usedNames);
+    const nameBytes = encoder.encode(filename);
+    const data = new Uint8Array(await result.blob.arrayBuffer());
+    const crc = crc32(data);
+    ensureZipSize(data.length);
+    ensureZipSize(offset);
+
+    const localHeader = concatBytes(
+      u32(0x04034b50),
+      u16(20),
+      u16(0x0800),
+      u16(0),
+      u16(dosTime),
+      u16(dosDate),
+      u32(crc),
+      u32(data.length),
+      u32(data.length),
+      u16(nameBytes.length),
+      u16(0),
+      nameBytes,
+    );
+
+    chunks.push(localHeader, data);
+
+    centralDirectory.push(
+      concatBytes(
+        u32(0x02014b50),
+        u16(20),
+        u16(20),
+        u16(0x0800),
+        u16(0),
+        u16(dosTime),
+        u16(dosDate),
+        u32(crc),
+        u32(data.length),
+        u32(data.length),
+        u16(nameBytes.length),
+        u16(0),
+        u16(0),
+        u16(0),
+        u16(0),
+        u32(0),
+        u32(offset),
+        nameBytes,
+      ),
+    );
+
+    offset += localHeader.length + data.length;
+  }
+
+  const centralOffset = offset;
+  const centralBytes = concatBytes(...centralDirectory);
+  const centralSize = centralBytes.length;
+  ensureZipSize(centralOffset);
+  ensureZipSize(centralSize);
+
+  const endRecord = concatBytes(
+    u32(0x06054b50),
+    u16(0),
+    u16(0),
+    u16(results.length),
+    u16(results.length),
+    u32(centralSize),
+    u32(centralOffset),
+    u16(0),
+  );
+
+  return new Blob([...chunks, centralBytes, endRecord], {
+    type: "application/zip",
+  });
+}
+
+function toZipDosDateTime(date) {
+  const year = Math.max(1980, date.getFullYear());
+  return {
+    dosTime:
+      (date.getHours() << 11) |
+      (date.getMinutes() << 5) |
+      Math.floor(date.getSeconds() / 2),
+    dosDate: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate(),
+  };
+}
+
+function sanitizeZipName(filename, index) {
+  const fallback = `image-${index + 1}.webp`;
+  const name = (filename || fallback).replace(/[\\/]/g, "-").trim();
+  return name && name !== "." && name !== ".." ? name : fallback;
+}
+
+function dedupeZipName(filename, usedNames) {
+  if (!usedNames.has(filename)) {
+    usedNames.add(filename);
+    return filename;
+  }
+
+  const dot = filename.lastIndexOf(".");
+  const stem = dot > 0 ? filename.slice(0, dot) : filename;
+  const ext = dot > 0 ? filename.slice(dot) : "";
+  let index = 2;
+  let next = `${stem}-${index}${ext}`;
+  while (usedNames.has(next)) {
+    index += 1;
+    next = `${stem}-${index}${ext}`;
+  }
+  usedNames.add(next);
+  return next;
+}
+
+function ensureZipSize(value) {
+  if (value > 0xffffffff) {
+    throw new Error("브라우저 ZIP 저장은 4GB 이하 결과만 지원합니다.");
+  }
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let value = i;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[i] = value >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function u16(value) {
+  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
+}
+
+function u32(value) {
+  return new Uint8Array([
+    value & 0xff,
+    (value >>> 8) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 24) & 0xff,
+  ]);
+}
+
+function concatBytes(...parts) {
+  const length = parts.reduce((sum, part) => sum + part.length, 0);
+  const output = new Uint8Array(length);
+  let offset = 0;
+  for (const part of parts) {
+    output.set(part, offset);
+    offset += part.length;
+  }
+  return output;
 }
 
 function renderBulkQueue() {
@@ -941,7 +1114,7 @@ function setWebpFiles(files) {
   webpStageTitle.textContent = webpItems.length ? "파일 준비됨" : "파일 확인 필요";
   webpStageMeta.textContent = rejectedCount
     ? `${webpItems.length}개 선택됨 · 지원하지 않는 파일 ${rejectedCount}개 제외`
-    : `${webpItems.length}개 선택됨`;
+    : `${webpItems.length}개 선택됨 · 최적화 후 저장 버튼으로 내려받습니다.`;
   webpResultMeta.textContent = "-";
   webpOutputSize.textContent = "-";
   renderWebpQueue();
@@ -1031,13 +1204,13 @@ async function processWebpImages() {
       webpOutputBlob = results[0].blob;
       webpOutputName = results[0].filename;
       webpOutputFormat = "webp";
-      webpStageMeta.textContent = `${results[0].filename} 파일을 준비했습니다.`;
+      webpStageMeta.textContent = `${results[0].filename} 파일을 준비했습니다. WebP 저장을 눌러 저장 위치를 선택하세요.`;
     } else {
       showJobProgress(progressToken, "ZIP 생성 중", `${results.length}개 WebP 결과를 ZIP으로 묶고 있습니다.`);
       webpOutputName = buildWebpArchiveName();
       webpOutputBlob = await createBulkArchive(results, webpOutputName);
       webpOutputFormat = "zip";
-      webpStageMeta.textContent = `${results.length}개 WebP 결과를 ZIP으로 준비했습니다.`;
+      webpStageMeta.textContent = `${results.length}개 WebP 결과를 ZIP으로 준비했습니다. ZIP 저장을 눌러 저장 위치를 선택하세요.`;
     }
 
     webpOutputSize.textContent = formatBytes(webpOutputBlob.size);
@@ -1088,7 +1261,7 @@ function clearWebpFiles() {
   webpFileMeta.textContent = "PNG, JPG, WebP, BMP, TIFF";
   webpOptimizeButton.disabled = true;
   webpSaveButton.disabled = true;
-  webpSaveButton.textContent = "결과 저장";
+  webpSaveButton.textContent = "최적화 후 저장";
   webpClearButton.disabled = true;
   webpStageTitle.textContent = "WebP 최적화 대기";
   webpStageMeta.textContent = "한 장 또는 여러 이미지를 선택하면 WebP 결과가 준비됩니다.";
