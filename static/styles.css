@@ -601,7 +601,7 @@ select {
 
 .stage {
   display: grid;
-  grid-template-rows: auto auto minmax(220px, 1fr);
+  grid-template-rows: auto auto minmax(160px, 1fr);
   gap: 16px;
   min-height: calc(100vh - 138px);
   padding: 16px;
@@ -687,47 +687,61 @@ select {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  align-items: start;
 }
 
 .bulk-summary-item {
   display: grid;
-  grid-template-rows: auto auto minmax(72px, 1fr);
-  gap: 8px;
-  min-height: 154px;
-  padding: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  gap: 8px 10px;
+  min-height: 104px;
+  overflow: hidden;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffefb;
 }
 
 .bulk-summary-item > span {
+  grid-column: 1;
+  grid-row: 1;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 .bulk-summary-item > strong {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   color: var(--ink);
-  font-size: 1.2rem;
+  font-size: 1rem;
+  line-height: 1.1;
 }
 
 .summary-preview {
+  grid-column: 1 / -1;
   min-width: 0;
-  min-height: 72px;
+  min-height: 46px;
+  max-height: 74px;
+  overflow: hidden;
 }
 
 .summary-thumbs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  align-content: start;
+  max-height: 74px;
+  overflow: hidden;
 }
 
 .summary-thumb {
   position: relative;
   display: block;
-  width: 100%;
-  aspect-ratio: 1;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -750,13 +764,15 @@ select {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .summary-more {
   display: grid;
+  flex: 0 0 44px;
   place-items: center;
-  aspect-ratio: 1;
+  width: 44px;
+  height: 44px;
   border: 1px dashed var(--line);
   border-radius: 6px;
   color: var(--muted);
@@ -769,7 +785,7 @@ select {
 .summary-package {
   display: grid;
   gap: 4px;
-  min-height: 72px;
+  min-height: 46px;
   align-content: center;
   color: var(--muted);
   font-size: 0.78rem;
@@ -792,11 +808,13 @@ select {
 .summary-file-list {
   display: grid;
   gap: 6px;
+  max-height: 74px;
+  overflow: hidden;
 }
 
 .summary-file-row {
   min-width: 0;
-  padding: 7px 8px;
+  padding: 5px 6px;
   border: 1px solid rgba(198, 90, 58, 0.25);
   border-radius: 6px;
   background: rgba(198, 90, 58, 0.06);
@@ -830,7 +848,7 @@ select {
 
 .bulk-empty {
   display: grid;
-  min-height: 260px;
+  min-height: 180px;
   place-items: center;
   color: rgba(31, 42, 46, 0.45);
   font-weight: 800;
@@ -953,6 +971,17 @@ select {
 
   .bulk-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bulk-summary-item {
+    min-height: 96px;
+  }
+
+  .summary-thumb,
+  .summary-more {
+    flex-basis: 38px;
+    width: 38px;
+    height: 38px;
   }
 
   .bulk-row {

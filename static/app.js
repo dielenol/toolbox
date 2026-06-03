@@ -1132,7 +1132,7 @@ function renderSummaryThumbs(counterElement, items, urlKey, emptyText) {
 
   const strip = document.createElement("div");
   strip.className = "summary-thumbs";
-  const limit = visibleItems.length > 8 ? 7 : 8;
+  const limit = visibleItems.length > 6 ? 5 : 6;
 
   visibleItems.slice(0, limit).forEach((item) => {
     const thumb = document.createElement("span");
@@ -1161,7 +1161,7 @@ function renderSummaryFailures(counterElement, failedItems) {
   const host = getSummaryPreviewHost(counterElement);
 
   if (!failedItems.length) {
-    appendSummaryEmpty(host, "실패한 파일이 여기에 표시됩니다.");
+    appendSummaryEmpty(host, "실패 없음");
     return;
   }
 
@@ -1199,7 +1199,7 @@ function renderSummaryPackage(counterElement, blob, filename, label) {
   const host = getSummaryPreviewHost(counterElement);
 
   if (!blob) {
-    appendSummaryEmpty(host, "완료 후 저장 파일이 여기에 준비됩니다.");
+    appendSummaryEmpty(host, "완료 후 저장 준비");
     return;
   }
 
@@ -1281,8 +1281,8 @@ function updateBulkSummary() {
     packageBlob: bulkArchiveBlob,
     packageName: bulkArchiveName,
     packageLabel: "ZIP",
-    totalEmptyText: "선택한 원본 이미지가 여기에 표시됩니다.",
-    doneEmptyText: "완료된 누끼 결과가 여기에 표시됩니다.",
+    totalEmptyText: "원본 미리보기",
+    doneEmptyText: "완료 후 표시",
   });
   bulkFileMeta.textContent = bulkItems.length
     ? `${bulkItems.length}개 · ${formatBytes(bulkItems.reduce((sum, item) => sum + item.file.size, 0))}`
@@ -1529,8 +1529,8 @@ function updateWebpSummary() {
     packageBlob: webpOutputBlob,
     packageName: webpOutputName,
     packageLabel: webpOutputFormat === "webp" ? "WebP" : "ZIP",
-    totalEmptyText: "선택한 원본 이미지가 여기에 표시됩니다.",
-    doneEmptyText: "최적화된 WebP 결과가 여기에 표시됩니다.",
+    totalEmptyText: "원본 미리보기",
+    doneEmptyText: "완료 후 표시",
   });
   webpFileMeta.textContent = webpItems.length
     ? `${webpItems.length}개 · ${formatBytes(webpItems.reduce((sum, item) => sum + item.file.size, 0))}`
