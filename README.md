@@ -1,31 +1,22 @@
 # Toolbox
 
-로컬에서 실행하는 이미지 작업대입니다. 브라우저 UI에서 배경제거(누끼)와 이미지 확장자 변환을 처리하고, 결과 파일은 사용자가 고른 위치에 저장할 수 있습니다.
+로컬에서 실행하는 이미지 작업 도구입니다. 브라우저 UI에서 배경 제거(누끼), 벌크 배경 제거, WebP 최적화, 이미지 형식 변환을 처리하고 결과 파일을 사용자가 고른 위치에 저장합니다.
 
-기본 누끼 모델은 `BiRefNet HQ`입니다. Photoshop/Adobe Express류의 원클릭 배경제거에 가까운 품질을 목표로 하며, 모델 실행과 파일 저장은 로컬 서버에서 처리합니다.
+이 저장소는 `pnpm dev`로 실행하는 Node/Vite 앱이 아닙니다. 현재 스펙은 **Python FastAPI 서버 + 정적 프론트엔드**입니다. 개발 서버는 `uvicorn app.main:app`로 실행합니다.
 
-## 기능
+## 현재 실행 스펙
 
-- 고품질 배경제거: `BiRefNet HQ`, `ISNet`, `U2-Net`, 인물/애니 특화 모델 선택
-- 벌크 배경제거: 여러 이미지를 순차 처리하고 성공 결과를 ZIP으로 저장
-- WebP 최적화: 한 장 또는 여러 이미지를 WebP로 변환하고 단일 파일/ZIP으로 저장
-- 품질 프리셋: `Ultra`, `Studio`, `Balanced`, `Fast`
-- 엣지 보정: 머리카락/반투명 보정, 마스크 정리, 테두리 색 번짐 제거
-- 저장 형식: 투명 PNG 저장, 무손실 WebP 최적화 저장
-- 파일 변환: PNG, JPG, WebP, BMP, TIFF, ICO 상호 변환
-- 크기 조정: 원본 유지, 긴 변 기준 최대 128px, 256px, 512px
-- 저장 위치 선택: 브라우저 저장 API 또는 로컬 데스크톱 저장 대화상자
-- 드래그 앤 드롭: 파일 업로드 영역뿐 아니라 페이지 전체 드롭 지원
-- 진행 표시: 누끼/벌크누끼/WebP 최적화/변환/WebP 저장 중 중앙 progress overlay 표시
+- Backend: FastAPI `0.115.6`
+- Frontend: `static/index.html`과 ES module JavaScript
+- Server entrypoint: `app.main:app`
+- 기본 URL: `http://127.0.0.1:8000`
+- Python: 3.10 이상 권장
+- Package manager: `pip`
+- Node/pnpm: 앱 실행에는 사용하지 않습니다. JS 문법 확인이 필요할 때만 `node --check`를 선택적으로 씁니다.
 
-## 요구 사항
+## 빠른 실행
 
-- Windows 기준으로 작성되어 있습니다.
-- Python 3.10 이상을 권장합니다.
-- 첫 실행 때 모델 파일을 내려받기 때문에 인터넷 연결이 필요할 수 있습니다.
-- `BiRefNet HQ`는 CPU에서도 동작하지만 큰 이미지는 느릴 수 있습니다. CUDA 환경은 별도 PyTorch 설치 구성이 필요합니다.
-
-## 설치 및 실행
+Warp, PowerShell, Windows Terminal 모두 프로젝트 루트에서 아래처럼 실행합니다.
 
 ```powershell
 python -m venv .venv
@@ -37,18 +28,63 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 브라우저에서 `http://127.0.0.1:8000`을 엽니다.
 
-이미 다른 서비스가 8000번 포트를 쓰고 있으면 다른 포트를 지정합니다.
+8000번 포트가 이미 사용 중이면 포트를 바꿉니다.
 
 ```powershell
 uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
+
+### Warp에서 `pnpm dev`가 안 켜질 때
+
+정상입니다. 이 프로젝트에는 `package.json`과 `dev` 스크립트가 없습니다. `pnpm dev` 대신 위의 `uvicorn` 명령을 사용하세요.
+
+가상환경이 이미 만들어져 있으면 설치 단계를 건너뛰고 아래만 실행해도 됩니다.
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+PowerShell 실행 정책 때문에 가상환경 활성화가 막히면 현재 터미널 세션에서만 정책을 완화한 뒤 다시 활성화합니다.
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+또는 활성화 없이 직접 실행할 수 있습니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+## 주요 기능
+
+- 고품질 배경 제거: `BiRefNet HQ`, `ISNet General`, `U2-Net`, `U2-Netp`, 인물/애니 특화 모델
+- 벌크 배경 제거: 여러 이미지를 순차 처리하고 성공 결과를 ZIP으로 저장
+- WebP 최적화: 단일/다중 이미지를 WebP로 변환하고 단일 파일 또는 ZIP으로 저장
+- 품질 프리셋: `Ultra`, `Studio`, `Balanced`, `Fast`
+- 엣지 보정: 머리카락/반투명 보정, 마스크 정리, 테두리 색 번짐 제거
+- 파일 변환: PNG, JPG, WebP, BMP, TIFF, ICO 출력 지원
+- 크기 조정: 변환은 최대 128px/256px/512px, WebP 최적화는 최대 512px/1024px/1920px/2048px
+- 저장 위치 선택: 브라우저 File System Access API 또는 서버의 로컬 저장 대화상자
+- 드래그 앤 드롭: 각 업로드 영역과 페이지 전체 드롭 지원
+- 진행 표시: 누끼, 벌크누끼, WebP 최적화, 파일 변환 작업 중 progress overlay 표시
+
+## 요구 사항
+
+- Windows 로컬 실행 기준으로 작성되어 있습니다.
+- 첫 배경 제거 실행 때 모델 파일을 내려받을 수 있으므로 인터넷 연결이 필요할 수 있습니다.
+- `BiRefNet HQ`는 CPU에서도 동작하지만 큰 이미지는 느릴 수 있습니다.
+- CUDA를 쓰려면 `requirements.txt`의 CPU PyTorch 구성 대신 환경에 맞는 PyTorch 설치가 필요합니다.
+- `/api/save`의 서버 저장 대화상자는 데스크톱 Python의 `tkinter`에 의존합니다.
 
 ## 사용 흐름
 
 ### 누끼
 
 1. `누끼` 탭에서 이미지를 선택하거나 페이지에 드롭합니다.
-2. 품질 프리셋을 고릅니다. 처음에는 `Ultra`를 권장합니다.
+2. 품질 프리셋을 고릅니다. 처음에는 `Ultra`가 기본값입니다.
 3. 필요하면 모델, 엣지, 임계값을 조정합니다.
 4. `누끼 따기`를 누릅니다.
 5. 결과를 `PNG 저장` 또는 `WebP 저장`으로 저장합니다.
@@ -74,44 +110,54 @@ uvicorn app.main:app --host 127.0.0.1 --port 8010
 1. `파일 변환` 탭에서 이미지를 선택하거나 페이지에 드롭합니다.
 2. 출력 형식을 고릅니다.
 3. JPG/BMP는 배경색, JPG/WebP는 품질, ICO는 포함할 아이콘 크기를 조정합니다.
-4. 필요하면 출력 최대 크기를 선택합니다.
+4. 필요하면 긴 변 기준 출력 최대 크기를 선택합니다.
 5. `변환하기` 후 `파일 저장`으로 저장합니다.
 
-## 품질 옵션 가이드
+## 모델과 품질 옵션
 
 ### 모델
 
-- `BiRefNet HQ`: 제품 사진, 머리카락, 털, 복잡한 배경처럼 경계 품질이 중요한 이미지에 적합합니다.
-- `ISNet General`: 품질과 속도의 균형이 좋습니다.
-- `U2-Net`: 일반적인 이미지에서 빠르고 안정적입니다.
-- `U2-Netp`: 가장 빠른 미리보기용 모델입니다.
-- `Human Segmentation`: 사람 중심 사진에 적합합니다.
-- `ISNet Anime`: 애니메이션, 일러스트, 캐릭터 이미지에 적합합니다.
+| 모델 | 용도 |
+| --- | --- |
+| `birefnet-hq` | 가장 정밀한 배경 제거. 제품 윤곽, 머리카락, 복잡한 배경에 적합 |
+| `isnet-general-use` | 품질과 속도의 균형이 좋은 일반 사진용 모델 |
+| `u2net` | 빠르고 안정적인 균형형 모델 |
+| `u2netp` | 가장 빠른 미리보기용 모델 |
+| `u2net_human_seg` | 사람 중심 사진용 모델 |
+| `isnet-anime` | 애니메이션, 일러스트, 캐릭터 이미지용 모델 |
 
 ### 프리셋
 
-- `Ultra`: 최고 품질 우선. 느리지만 복잡한 경계에 유리합니다.
-- `Studio`: 품질 우선. 제품 사진이나 인물에 무난합니다.
-- `Balanced`: 속도와 품질의 중간값입니다.
-- `Fast`: 빠른 확인이나 단순한 배경에 적합합니다.
+| 프리셋 | 기본 모델 | 설명 |
+| --- | --- | --- |
+| `Ultra` | `birefnet-hq` | 가장 정밀합니다. 느리지만 복잡한 경계에 유리합니다. |
+| `Studio` | `isnet-general-use` | 품질 우선입니다. 일반 제품 사진이나 인물에 무난합니다. |
+| `Balanced` | `u2net` | 속도와 품질의 중간값입니다. |
+| `Fast` | `u2netp` | 가장 빠릅니다. 대략적인 확인이나 단순한 이미지에 적합합니다. |
 
 ### 세부 옵션
 
-- 머리카락/반투명 보정: 얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.
+- 머리카락/반투명 보정: 얇은 머리카락, 털, 비치는 천 같은 가장자리를 자연스럽게 살립니다.
 - 마스크 정리: 배경에 남은 점이나 작은 구멍을 정리합니다.
 - 테두리 색 번짐 제거: 기존 배경색이 피사체 가장자리에 묻은 현상을 줄입니다.
 - 부드럽게: 경계의 계단 현상을 줄입니다. 많이 올리면 얇은 디테일이 흐려질 수 있습니다.
 - 안쪽으로 줄이기: 배경 잔여 테두리를 줄입니다. 많이 올리면 피사체 윤곽이 깎일 수 있습니다.
-- 피사체 확신/배경 확신: alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 기본값을 유지하세요.
+- 피사체 확신/배경 확신: alpha matting이 켜졌을 때 쓰는 기준값입니다.
 
-## 제한과 보안
+## 지원 형식과 제한
 
-- 업로드 파일은 기본 100 MB까지 허용합니다.
-- 이미지는 기본 80 MP까지 처리합니다.
-- 픽셀 수는 파일 전체를 디코딩하기 전에 이미지 헤더 기준으로 먼저 검사합니다.
-- `BiRefNet HQ`는 Hugging Face 모델 저장소의 커스텀 코드를 사용합니다. 기본 revision은 고정되어 있으며, 변경하려면 `TOOLBOX_BIREFNET_REVISION`을 명시하세요.
-- `/api/save`는 로컬 저장 대화상자를 띄우기 위해 데스크톱 환경의 `tkinter`를 사용합니다.
-- 이 프로젝트는 로컬 작업용입니다. 외부 네트워크에 공개해서 쓰는 서버로 설계되어 있지 않습니다.
+| 항목 | 현재 값 |
+| --- | --- |
+| 누끼/벌크/WebP 입력 | PNG, JPG, WebP, BMP, TIFF |
+| 파일 변환 입력 | PNG, JPG, WebP, BMP, TIFF, ICO |
+| 파일 변환 출력 | PNG, JPG, WebP, BMP, TIFF, ICO |
+| 변환 출력 크기 | 원본 유지 또는 긴 변 기준 최대 128px/256px/512px |
+| WebP 출력 크기 | 원본 유지 또는 긴 변 기준 최대 512px/1024px/1920px/2048px |
+| ICO 크기 | 16, 32, 48, 64, 128, 256 |
+| 업로드 제한 | 기본 100 MB |
+| 이미지 제한 | 기본 80 MP |
+
+픽셀 수는 파일 전체를 디코딩하기 전에 이미지 헤더 기준으로 먼저 검사합니다. 이 프로젝트는 로컬 작업용이며 외부 네트워크에 공개하는 서버로 설계되어 있지 않습니다.
 
 ## 환경 변수
 
@@ -129,8 +175,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8010
 
 잘못된 숫자 설정값은 앱을 즉시 중단하지 않고 기본값으로 되돌립니다.
 
-예시:
-
 ```powershell
 $env:TOOLBOX_MAX_UPLOAD_BYTES = "52428800"
 $env:TOOLBOX_TORCH_THREADS = "4"
@@ -145,8 +189,6 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 GET /api/health
 ```
 
-응답:
-
 ```json
 { "status": "ok" }
 ```
@@ -157,7 +199,7 @@ GET /api/health
 GET /api/models
 ```
 
-사용 가능한 누끼 모델과 기본 모델을 반환합니다.
+사용 가능한 배경 제거 모델과 기본 모델을 반환합니다.
 
 ### 변환 형식 목록
 
@@ -187,7 +229,7 @@ Content-Type: multipart/form-data
 - `edge_feather`: 경계 부드럽게 처리할 반경
 - `png_compression`: PNG 압축 레벨. 0부터 9 사이로 보정됩니다.
 
-응답은 투명 배경의 PNG입니다.
+응답은 투명 배경 PNG입니다.
 
 응답 헤더:
 
@@ -208,7 +250,7 @@ Content-Type: multipart/form-data
 - `file`: 이미지 파일
 - `output_format`: `png`, `jpg`, `webp`, `bmp`, `tiff`, `ico`
 - `background_color`: JPG/BMP처럼 알파 채널이 없는 형식으로 저장할 때 사용할 배경색
-- `quality`: JPG/WebP 품질
+- `quality`: JPG/WebP 품질. 1부터 100 사이로 보정됩니다.
 - `webp_lossless`: WebP를 무손실로 저장할지 여부
 - `ico_sizes`: `16,32,48,64,128,256` 같은 ICO 출력 크기 목록. ICO는 8부터 256 사이만 허용합니다.
 - `output_size`: 긴 변 기준 최대 크기. `0`이면 원본 크기를 유지하고, 8부터 4096 사이 값을 허용합니다.
@@ -273,7 +315,7 @@ Content-Type: multipart/form-data
 ```text
 app/
   main.py        FastAPI 엔드포인트
-  remover.py     배경제거 모델 실행과 후처리
+  remover.py     배경 제거 모델 실행과 후처리
   converter.py   이미지 형식 변환
   local_save.py  로컬 저장 대화상자
   settings.py    환경 변수와 제한값
@@ -285,7 +327,7 @@ tests/
   test_converter.py
 ```
 
-검증:
+Python 검증:
 
 ```powershell
 python -m compileall app tests
@@ -299,6 +341,14 @@ Get-ChildItem -Path static -Recurse -Filter *.js | ForEach-Object { node --check
 ```
 
 ## 문제 해결
+
+### `pnpm dev`가 동작하지 않음
+
+현재 저장소는 Node 개발 서버를 쓰지 않으므로 `pnpm dev`는 실행 대상이 없습니다. `uvicorn app.main:app --host 127.0.0.1 --port 8000`으로 실행하세요.
+
+### 브라우저에서 서버 확인 필요로 표시됨
+
+FastAPI 서버가 켜져 있는지 확인하고 `http://127.0.0.1:8000`으로 접속했는지 확인하세요. 포트를 바꿔 실행했다면 접속 URL도 같은 포트로 바꿔야 합니다.
 
 ### 첫 누끼 실행이 오래 걸림
 
@@ -318,4 +368,4 @@ Get-ChildItem -Path static -Recurse -Filter *.js | ForEach-Object { node --check
 
 ### WebP가 생각보다 큼
 
-누끼 결과의 `WebP 저장`은 품질 손실을 피하기 위해 무손실 WebP를 사용합니다. 더 작은 파일이 필요하면 파일 변환 탭에서 WebP 품질 값을 낮춰 저장하세요.
+누끼 결과의 `WebP 저장`은 품질 손실을 피하기 위해 무손실 WebP를 사용합니다. 더 작은 파일이 필요하면 파일 변환 탭이나 WebP 최적화 탭에서 품질 값을 낮춰 저장하세요.
