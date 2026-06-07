@@ -16,13 +16,10 @@
 
 ## 빠른 실행
 
-Warp, PowerShell, Windows Terminal 모두 프로젝트 루트에서 아래처럼 실행합니다.
+이미 가상환경과 패키지 설치가 끝난 뒤에는 프로젝트 루트에서 아래만 실행합니다.
 
 ```powershell
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -34,16 +31,24 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
 
-### Warp에서 `pnpm dev`가 안 켜질 때
-
-정상입니다. 이 프로젝트에는 `package.json`과 `dev` 스크립트가 없습니다. `pnpm dev` 대신 위의 `uvicorn` 명령을 사용하세요.
-
-가상환경이 이미 만들어져 있으면 설치 단계를 건너뛰고 아래만 실행해도 됩니다.
+활성화 없이 직접 실행할 수도 있습니다.
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+## 최초 1회 설치
+
+처음 받았거나 `.venv`를 새로 만드는 경우에만 실행합니다. 이미 설치가 끝났다면 이 섹션은 매번 반복하지 않아도 됩니다.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+`requirements.txt`가 바뀌었거나 가상환경을 지웠을 때만 패키지를 다시 설치하세요.
 
 PowerShell 실행 정책 때문에 가상환경 활성화가 막히면 현재 터미널 세션에서만 정책을 완화한 뒤 다시 활성화합니다.
 
@@ -52,11 +57,9 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\.venv\Scripts\Activate.ps1
 ```
 
-또는 활성화 없이 직접 실행할 수 있습니다.
+### Warp에서 `pnpm dev`가 안 켜질 때
 
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+정상입니다. 이 프로젝트에는 `package.json`과 `dev` 스크립트가 없습니다. `pnpm dev` 대신 `uvicorn app.main:app --host 127.0.0.1 --port 8000`으로 실행하세요.
 
 ## 주요 기능
 
