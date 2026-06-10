@@ -2,7 +2,7 @@
 
 로컬에서 실행하는 이미지 작업 도구입니다. 브라우저 UI에서 배경 제거(누끼), 벌크 배경 제거, WebP 최적화, 이미지 형식 변환을 처리하고 결과 파일을 사용자가 고른 위치에 저장합니다.
 
-이 저장소는 `pnpm dev`로 실행하는 Node/Vite 앱이 아닙니다. 현재 스펙은 **Python FastAPI 서버 + 정적 프론트엔드**입니다. 개발 서버는 `uvicorn app.main:app`로 실행합니다.
+이 저장소는 Node/Vite 앱이 아니라 **Python FastAPI 서버 + 정적 프론트엔드**입니다. 편의상 `package.json`의 script alias로 `pnpm dev`와 `npm run dev`를 지원하며, 내부에서는 `uvicorn app.main:app`를 실행합니다.
 
 ## 현재 실행 스펙
 
@@ -12,15 +12,20 @@
 - 기본 URL: `http://127.0.0.1:8000`
 - Python: 3.10 이상 권장
 - Package manager: `pip`
-- Node/pnpm: 앱 실행에는 사용하지 않습니다. JS 문법 확인이 필요할 때만 `node --check`를 선택적으로 씁니다.
+- Node/pnpm: 앱 런타임에는 필요하지 않습니다. 실행 단축 명령과 JS 문법 확인에만 선택적으로 씁니다.
 
 ## 빠른 실행
 
 이미 가상환경과 패키지 설치가 끝난 뒤에는 프로젝트 루트에서 아래만 실행합니다.
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+pnpm dev
+```
+
+pnpm이 없으면 npm으로도 실행할 수 있습니다.
+
+```powershell
+npm run dev
 ```
 
 브라우저에서 `http://127.0.0.1:8000`을 엽니다.
@@ -28,13 +33,13 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 8000번 포트가 이미 사용 중이면 포트를 바꿉니다.
 
 ```powershell
-uvicorn app.main:app --host 127.0.0.1 --port 8010
+pnpm dev -- -Port 8010
 ```
 
-활성화 없이 직접 실행할 수도 있습니다.
+PowerShell 스크립트를 직접 실행할 수도 있습니다.
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.\scripts\dev.ps1
 ```
 
 ## 최초 1회 설치
@@ -59,7 +64,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ### Warp에서 `pnpm dev`가 안 켜질 때
 
-정상입니다. 이 프로젝트에는 `package.json`과 `dev` 스크립트가 없습니다. `pnpm dev` 대신 `uvicorn app.main:app --host 127.0.0.1 --port 8000`으로 실행하세요.
+pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰거나 `.\scripts\dev.ps1`을 직접 실행하세요. Python 패키지 오류가 나면 먼저 최초 1회 설치 섹션의 `pip install -r requirements.txt`까지 끝냈는지 확인하세요.
 
 ## 주요 기능
 
@@ -181,7 +186,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```powershell
 $env:TOOLBOX_MAX_UPLOAD_BYTES = "52428800"
 $env:TOOLBOX_TORCH_THREADS = "4"
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+pnpm dev
 ```
 
 ## API
@@ -347,7 +352,7 @@ Get-ChildItem -Path static -Recurse -Filter *.js | ForEach-Object { node --check
 
 ### `pnpm dev`가 동작하지 않음
 
-현재 저장소는 Node 개발 서버를 쓰지 않으므로 `pnpm dev`는 실행 대상이 없습니다. `uvicorn app.main:app --host 127.0.0.1 --port 8000`으로 실행하세요.
+`pnpm dev`는 루트의 `package.json`에서 `scripts/dev.ps1`을 호출합니다. pnpm이 없으면 `npm run dev` 또는 `.\scripts\dev.ps1`을 사용하세요.
 
 ### 브라우저에서 서버 확인 필요로 표시됨
 
