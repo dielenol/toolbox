@@ -10,7 +10,7 @@
 - Frontend: `static/index.html`과 ES module JavaScript
 - Server entrypoint: `app.main:app`
 - 기본 URL: `http://127.0.0.1:8000`
-- Python: 3.10 또는 3.11 권장
+- Python: 3.11 이상
 - Package manager: `pip`
 - Node/pnpm: 앱 런타임에는 필요하지 않습니다. 실행 단축 명령과 JS 문법 확인에만 선택적으로 씁니다.
 
@@ -138,20 +138,27 @@ pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰세요. Python 패키�
 
 | 모델 | 용도 |
 | --- | --- |
-| `birefnet-hq` | 가장 정밀한 배경 제거. 제품 윤곽, 머리카락, 복잡한 배경에 적합 |
-| `isnet-general-use` | 품질과 속도의 균형이 좋은 일반 사진용 모델 |
-| `u2net` | 빠르고 안정적인 균형형 모델 |
+| `birefnet-hq` | 만능 최고 품질. 복잡한 배경, 제품 윤곽, 머리카락에 적합 |
+| `birefnet-massive` | 캐릭터, 피규어, 복잡한 실루엣 같은 어려운 경계용 |
+| `birefnet-hrsod` | 로고, 제품, 고해상도 피사체 윤곽용 |
+| `birefnet-portrait` | 인물과 프로필 사진용 |
+| `isnet-anime` | 애니메이션, 일러스트, 2D 캐릭터 이미지용 |
+| `bria-rmbg` | 제품, 로고, 문자 요소가 섞인 이미지용. 비상업/별도 라이선스 확인 필요 |
+| `birefnet-general` | 일반 사진용 최신 BiRefNet 계열 |
+| `birefnet-general-lite` | 벌크 작업에 쓰기 좋은 가벼운 BiRefNet 계열 |
+| `isnet-general-use` | 품질과 속도의 균형이 좋은 기존 일반 사진용 모델 |
+| `u2net_human_seg` | 사람 중심 이미지를 빠르게 처리하는 모델 |
+| `u2net` | 빠르고 안정적인 기존 균형형 모델 |
 | `u2netp` | 가장 빠른 미리보기용 모델 |
-| `u2net_human_seg` | 사람 중심 사진용 모델 |
-| `isnet-anime` | 애니메이션, 일러스트, 캐릭터 이미지용 모델 |
+| `silueta` | 빠른 일반 배경 제거 후보 |
 
 ### 프리셋
 
 | 프리셋 | 기본 모델 | 설명 |
 | --- | --- | --- |
 | `Ultra` | `birefnet-hq` | 가장 정밀합니다. 느리지만 복잡한 경계에 유리합니다. |
-| `Studio` | `isnet-general-use` | 품질 우선입니다. 일반 제품 사진이나 인물에 무난합니다. |
-| `Balanced` | `u2net` | 속도와 품질의 중간값입니다. |
+| `Studio` | `birefnet-general` | 품질 우선입니다. 일반 제품 사진이나 인물에 무난합니다. |
+| `Balanced` | `isnet-general-use` | 속도와 품질의 중간값입니다. |
 | `Fast` | `u2netp` | 가장 빠릅니다. 대략적인 확인이나 단순한 이미지에 적합합니다. |
 
 ### 세부 옵션
@@ -244,7 +251,7 @@ Content-Type: multipart/form-data
 필드:
 
 - `file`: 이미지 파일
-- `model_name`: `birefnet-hq`, `isnet-general-use`, `u2net`, `u2netp`, `u2net_human_seg`, `isnet-anime`
+- `model_name`: `/api/models`의 `models[].id` 값. 예: `birefnet-hq`, `birefnet-massive`, `birefnet-hrsod`, `birefnet-portrait`, `isnet-anime`, `bria-rmbg`, `birefnet-general`, `birefnet-general-lite`, `isnet-general-use`, `u2net_human_seg`, `u2net`, `u2netp`, `silueta`
 - `alpha_matting`: `true` 또는 `false`
 - `post_process_mask`: `true` 또는 `false`
 - `foreground_refine`: `true` 또는 `false`

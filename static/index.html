@@ -61,12 +61,23 @@
             <span id="modelProfile">최고 품질</span>
           </div>
           <select id="modelSelect" aria-label="모델 선택">
-            <option value="birefnet-hq" selected>BiRefNet HQ</option>
-            <option value="isnet-general-use">ISNet General</option>
-            <option value="u2net">U2-Net</option>
-            <option value="u2netp">U2-Netp</option>
-            <option value="u2net_human_seg">Human Segmentation</option>
-            <option value="isnet-anime">ISNet Anime</option>
+            <optgroup label="목적별 추천">
+              <option value="birefnet-hq" selected>만능 최고 품질 - BiRefNet HQ</option>
+              <option value="birefnet-massive">캐릭터/복잡 경계 - BiRefNet Massive</option>
+              <option value="birefnet-hrsod">로고/제품 윤곽 - BiRefNet HRSOD</option>
+              <option value="birefnet-portrait">인물/프로필 - BiRefNet Portrait</option>
+              <option value="isnet-anime">애니/일러스트 - ISNet Anime</option>
+              <option value="bria-rmbg">로고/문자/제품 - BRIA RMBG 2.0</option>
+            </optgroup>
+            <optgroup label="일반/벌크 후보">
+              <option value="birefnet-general">일반 고품질 - BiRefNet General</option>
+              <option value="birefnet-general-lite">가벼운 고품질 - BiRefNet General Lite</option>
+              <option value="isnet-general-use">기존 품질 우선 - ISNet General</option>
+              <option value="u2net_human_seg">인물 빠른 처리 - Human Segmentation</option>
+              <option value="u2net">균형 - U2-Net</option>
+              <option value="u2netp">최고 속도 - U2-Netp</option>
+              <option value="silueta">소형 일반 - Silueta</option>
+            </optgroup>
           </select>
           <p class="helper-text" id="modelHelp">
             가장 정밀한 모델입니다. 머리카락, 제품 윤곽, 복잡한 배경에 강하지만 처리 시간이 더 깁니다.
@@ -219,12 +230,23 @@
             <span id="bulkModelProfile">최고 품질</span>
           </div>
           <select id="bulkModelSelect" aria-label="벌크누끼 모델 선택">
-            <option value="birefnet-hq" selected>BiRefNet HQ</option>
-            <option value="isnet-general-use">ISNet General</option>
-            <option value="u2net">U2-Net</option>
-            <option value="u2netp">U2-Netp</option>
-            <option value="u2net_human_seg">Human Segmentation</option>
-            <option value="isnet-anime">ISNet Anime</option>
+            <optgroup label="목적별 추천">
+              <option value="birefnet-hq" selected>만능 최고 품질 - BiRefNet HQ</option>
+              <option value="birefnet-massive">캐릭터/복잡 경계 - BiRefNet Massive</option>
+              <option value="birefnet-hrsod">로고/제품 윤곽 - BiRefNet HRSOD</option>
+              <option value="birefnet-portrait">인물/프로필 - BiRefNet Portrait</option>
+              <option value="isnet-anime">애니/일러스트 - ISNet Anime</option>
+              <option value="bria-rmbg">로고/문자/제품 - BRIA RMBG 2.0</option>
+            </optgroup>
+            <optgroup label="일반/벌크 후보">
+              <option value="birefnet-general">일반 고품질 - BiRefNet General</option>
+              <option value="birefnet-general-lite">가벼운 고품질 - BiRefNet General Lite</option>
+              <option value="isnet-general-use">기존 품질 우선 - ISNet General</option>
+              <option value="u2net_human_seg">인물 빠른 처리 - Human Segmentation</option>
+              <option value="u2net">균형 - U2-Net</option>
+              <option value="u2netp">최고 속도 - U2-Netp</option>
+              <option value="silueta">소형 일반 - Silueta</option>
+            </optgroup>
           </select>
           <p class="helper-text" id="bulkModelHelp">
             가장 정밀한 모델입니다. 여러 장을 처리할 때는 처리 시간이 길어질 수 있습니다.

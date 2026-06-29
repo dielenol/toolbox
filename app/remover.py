@@ -19,14 +19,150 @@ from app.settings import (
 )
 
 
-REMBG_MODELS = (
-    "isnet-general-use",
-    "u2net",
-    "u2netp",
-    "u2net_human_seg",
-    "isnet-anime",
-)
+@dataclass(frozen=True)
+class ModelSpec:
+    id: str
+    name: str
+    profile: str
+    description: str
+    engine: str
+    license_note: str = ""
+
+    def to_payload(self) -> dict[str, str]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "profile": self.profile,
+            "description": self.description,
+            "engine": self.engine,
+            "license_note": self.license_note,
+        }
+
+
 BIREFNET_MODEL = "birefnet-hq"
+MODEL_CATALOG = (
+    ModelSpec(
+        id=BIREFNET_MODEL,
+        name="BiRefNet HQ",
+        profile="만능 최고 품질",
+        description="복잡한 배경, 제품 윤곽, 머리카락까지 가장 정밀하게 처리하는 기본 최고 품질 모델입니다.",
+        engine="transformers",
+    ),
+    ModelSpec(
+        id="birefnet-massive",
+        name="BiRefNet Massive",
+        profile="캐릭터/복잡 경계",
+        description="캐릭터, 피규어, 복잡한 실루엣처럼 경계가 많은 이미지에 우선 시도할 고품질 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="birefnet-hrsod",
+        name="BiRefNet HRSOD",
+        profile="로고/제품 윤곽",
+        description="고해상도 피사체와 선명한 제품/로고 윤곽을 따야 할 때 맞는 고품질 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="birefnet-portrait",
+        name="BiRefNet Portrait",
+        profile="인물/프로필",
+        description="사람 중심 이미지와 프로필 사진에 맞춘 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="isnet-anime",
+        name="ISNet Anime",
+        profile="애니/일러스트",
+        description="애니메이션, 일러스트, 2D 캐릭터 이미지에 맞춘 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="bria-rmbg",
+        name="BRIA RMBG 2.0",
+        profile="로고/문자/제품",
+        description="제품, 로고, 글자 요소가 섞인 이미지에 강한 모델입니다. 라이선스 제한을 확인하고 사용하세요.",
+        engine="rembg",
+        license_note="비상업/별도 라이선스 확인 필요",
+    ),
+    ModelSpec(
+        id="birefnet-general",
+        name="BiRefNet General",
+        profile="일반 고품질",
+        description="일반 사진 전반에 쓰기 좋은 최신 rembg BiRefNet 계열 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="birefnet-general-lite",
+        name="BiRefNet General Lite",
+        profile="가벼운 고품질",
+        description="BiRefNet 계열 중 상대적으로 가벼운 모델입니다. 벌크 작업에서 품질과 속도 균형이 필요할 때 쓰세요.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="isnet-general-use",
+        name="ISNet General",
+        profile="기존 품질 우선",
+        description="품질과 속도의 균형이 좋은 기존 일반 사진용 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="u2net_human_seg",
+        name="Human Segmentation",
+        profile="인물 빠른 처리",
+        description="사람만 빠르게 따고 싶을 때 선택하는 기존 인물 세그멘테이션 모델입니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="u2net",
+        name="U2-Net",
+        profile="균형",
+        description="빠르고 안정적인 기존 균형형 모델입니다. 대량 작업이나 단순 배경에 적합합니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="u2netp",
+        name="U2-Netp",
+        profile="최고 속도",
+        description="가장 빠른 미리보기용 모델입니다. 복잡한 가장자리 정밀도는 낮을 수 있습니다.",
+        engine="rembg",
+    ),
+    ModelSpec(
+        id="silueta",
+        name="Silueta",
+        profile="소형 일반",
+        description="가벼운 일반 배경 제거 모델입니다. 빠른 처리 후보로 두고 비교하세요.",
+        engine="rembg",
+    ),
+)
+MODEL_GROUPS = (
+    (
+        "recommended",
+        "목적별 추천",
+        (
+            BIREFNET_MODEL,
+            "birefnet-massive",
+            "birefnet-hrsod",
+            "birefnet-portrait",
+            "isnet-anime",
+            "bria-rmbg",
+        ),
+    ),
+    (
+        "general",
+        "일반/벌크 후보",
+        (
+            "birefnet-general",
+            "birefnet-general-lite",
+            "isnet-general-use",
+            "u2net_human_seg",
+            "u2net",
+            "u2netp",
+            "silueta",
+        ),
+    ),
+)
+MODEL_BY_ID = {model.id: model for model in MODEL_CATALOG}
+REMBG_MODELS = tuple(model.id for model in MODEL_CATALOG if model.engine == "rembg")
 SUPPORTED_MODELS = (BIREFNET_MODEL, *REMBG_MODELS)
 DEFAULT_MODEL = DEFAULT_MODEL_NAME if DEFAULT_MODEL_NAME in SUPPORTED_MODELS else BIREFNET_MODEL
 if DEFAULT_MODEL_NAME not in SUPPORTED_MODELS:

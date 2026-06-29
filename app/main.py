@@ -22,6 +22,8 @@ from app.converter import (
 from app.local_save import save_file_with_dialog
 from app.remover import (
     DEFAULT_MODEL,
+    MODEL_BY_ID,
+    MODEL_GROUPS,
     SUPPORTED_MODELS,
     ImageTooLargeError,
     InvalidImageError,
@@ -51,28 +53,18 @@ def health() -> dict[str, str]:
 
 @app.get("/api/models")
 def models() -> dict[str, object]:
+    groups = [
+        {
+            "id": group_id,
+            "name": group_name,
+            "models": [MODEL_BY_ID[model_id].to_payload() for model_id in model_ids],
+        }
+        for group_id, group_name, model_ids in MODEL_GROUPS
+    ]
     return {
         "default": DEFAULT_MODEL,
-        "models": [
-            {
-                "id": "birefnet-hq",
-                "name": "BiRefNet HQ",
-                "profile": "최고 품질",
-            },
-            {
-                "id": "isnet-general-use",
-                "name": "ISNet General",
-                "profile": "품질 우선",
-            },
-            {"id": "u2net", "name": "U2-Net", "profile": "균형"},
-            {"id": "u2netp", "name": "U2-Netp", "profile": "속도 우선"},
-            {
-                "id": "u2net_human_seg",
-                "name": "Human Segmentation",
-                "profile": "인물",
-            },
-            {"id": "isnet-anime", "name": "ISNet Anime", "profile": "애니/일러스트"},
-        ],
+        "groups": groups,
+        "models": [model.to_payload() for model in MODEL_BY_ID.values()],
     }
 
 

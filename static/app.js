@@ -1,4 +1,11 @@
-import { formatProfiles, modelHelps, modelProfiles, presetHelps, presets } from "./js/config.js";
+import {
+  fallbackModelGroups,
+  formatProfiles,
+  modelHelps,
+  modelProfiles,
+  presetHelps,
+  presets,
+} from "./js/config.js";
 import { el, getIcoSizeInputs, getSelectedIcoSizes } from "./js/elements.js";
 import {
   buildBulkArchiveName,
@@ -185,6 +192,9 @@ let activeBulkRequestId = 0;
 let webpRequestId = 0;
 let activeWebpRequestId = 0;
 let activeProgressToken = null;
+let defaultModelName = "birefnet-hq";
+let modelGroups = fallbackModelGroups;
+let modelInfoById = new Map();
 
 init();
 
@@ -196,6 +206,7 @@ function init() {
   bindBulkEvents();
   bindWebpEvents();
   bindConvertEvents();
+  setModelCatalog({ default: defaultModelName, groups: fallbackModelGroups }, { preserveSelection: false });
   applyPreset("ultra");
   applyBulkPreset("ultra");
   updateWebpControls();
@@ -500,6 +511,7 @@ async function checkApi() {
   try {
     const response = await fetch("/api/health");
     if (!response.ok) throw new Error("API unavailable");
+    await loadModelCatalog();
     apiStatus.textContent = "로컬 준비됨";
     apiStatus.className = "status-pill ready";
   } catch {
@@ -540,8 +552,8 @@ async function processImage() {
   showJobProgress(
     progressToken,
     "누끼 따는 중",
-    modelSelect.value === "birefnet-hq"
-      ? "고품질 모델로 가장자리를 계산하고 있습니다. 큰 이미지는 조금 걸릴 수 있어요."
+    isHeavyRemoveModel(modelSelect.value)
+      ? `${getModelLabel(modelSelect.value)}로 가장자리를 계산하고 있습니다. 큰 이미지는 조금 걸릴 수 있어요.`
       : "배경 마스크를 만들고 가장자리를 정리하고 있습니다.",
   );
   syncFloatingActions();
@@ -1645,7 +1657,7 @@ function applyPreset(name) {
   alphaMatting.checked = preset.alphaMatting;
   postProcess.checked = preset.postProcess;
   foregroundRefine.checked = preset.foregroundRefine;
-  modelSelect.value = preset.modelName;
+  selectModelValue(modelSelect, preset.modelName);
   updateModelHelp();
   edgeFeather.value = preset.edgeFeather;
   erodeSize.value = preset.erodeSize;
@@ -1667,7 +1679,7 @@ function applyBulkPreset(name) {
   bulkAlphaMatting.checked = preset.alphaMatting;
   bulkPostProcess.checked = preset.postProcess;
   bulkForegroundRefine.checked = preset.foregroundRefine;
-  bulkModelSelect.value = preset.modelName;
+  selectModelValue(bulkModelSelect, preset.modelName);
   updateBulkModelHelp();
   bulkEdgeFeather.value = preset.edgeFeather;
   bulkErodeSize.value = preset.erodeSize;
@@ -1777,14 +1789,102 @@ function refreshBulkLabels() {
 
 function updateModelHelp() {
   const model = modelSelect.value;
-  modelProfile.textContent = modelProfiles[model] ?? "사용자 선택";
-  modelHelp.textContent = modelHelps[model] ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
+  const info = modelInfoById.get(model);
+  modelProfile.textContent = info?.profile ?? modelProfiles[model] ?? "사용자 선택";
+  modelHelp.textContent = formatModelDescription(info, modelHelps[model]);
 }
 
 function updateBulkModelHelp() {
   const model = bulkModelSelect.value;
-  bulkModelProfile.textContent = modelProfiles[model] ?? "사용자 선택";
-  bulkModelHelp.textContent = modelHelps[model] ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
+  const info = modelInfoById.get(model);
+  bulkModelProfile.textContent = info?.profile ?? modelProfiles[model] ?? "사용자 선택";
+  bulkModelHelp.textContent = formatModelDescription(info, modelHelps[model]);
+}
+
+async function loadModelCatalog() {
+  try {
+    const response = await fetch("/api/models");
+    if (!response.ok) return;
+    const payload = await response.json();
+    setModelCatalog(payload);
+  } catch {
+    setModelCatalog({ default: defaultModelName, groups: fallbackModelGroups });
+  }
+}
+
+function setModelCatalog(payload, { preserveSelection = true } = {}) {
+  const previousCutoutModel = preserveSelection ? modelSelect.value : payload.default;
+  const previousBulkModel = preserveSelection ? bulkModelSelect.value : payload.default;
+
+  defaultModelName = payload.default || defaultModelName;
+  modelGroups = normalizeModelGroups(payload);
+  modelInfoById = new Map();
+  for (const group of modelGroups) {
+    for (const model of group.models || []) {
+      modelInfoById.set(model.id, model);
+    }
+  }
+
+  populateModelSelect(modelSelect, previousCutoutModel);
+  populateModelSelect(bulkModelSelect, previousBulkModel);
+  updateModelHelp();
+  updateBulkModelHelp();
+}
+
+function normalizeModelGroups(payload) {
+  if (Array.isArray(payload.groups) && payload.groups.length) {
+    return payload.groups;
+  }
+  if (Array.isArray(payload.models) && payload.models.length) {
+    return [{ id: "models", name: "모델", models: payload.models }];
+  }
+  return fallbackModelGroups;
+}
+
+function populateModelSelect(select, selectedModel) {
+  const fragment = document.createDocumentFragment();
+  for (const group of modelGroups) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.name;
+    for (const model of group.models || []) {
+      const option = document.createElement("option");
+      option.value = model.id;
+      option.textContent = `${model.profile} - ${model.name}`;
+      option.title = model.description || model.name;
+      optgroup.append(option);
+    }
+    fragment.append(optgroup);
+  }
+
+  select.replaceChildren(fragment);
+  selectModelValue(select, selectedModel || defaultModelName);
+}
+
+function selectModelValue(select, modelName) {
+  if (modelName && modelInfoById.has(modelName)) {
+    select.value = modelName;
+    return;
+  }
+  if (modelInfoById.has(defaultModelName)) {
+    select.value = defaultModelName;
+    return;
+  }
+  const firstModel = modelGroups.flatMap((group) => group.models || [])[0];
+  if (firstModel) select.value = firstModel.id;
+}
+
+function formatModelDescription(info, fallback) {
+  if (!info) return fallback ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
+  return [info.description, info.license_note].filter(Boolean).join(" ");
+}
+
+function getModelLabel(modelName) {
+  const info = modelInfoById.get(modelName);
+  return info?.name ?? modelName;
+}
+
+function isHeavyRemoveModel(modelName) {
+  return modelName.startsWith("birefnet") || modelName === "bria-rmbg";
 }
 
 function showJobProgress(token, title, detail) {

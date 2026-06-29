@@ -12,10 +12,10 @@ const venvPython = path.join(
   ".venv",
   isWindows ? "Scripts/python.exe" : "bin/python",
 );
-function commandSupportsPython310(command) {
+function commandSupportsPython311(command) {
   const result = spawnSync(
     command,
-    ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"],
+    ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)"],
     { stdio: "ignore" },
   );
   return result.status === 0;
@@ -34,8 +34,8 @@ function resolvePython() {
     return "python";
   }
 
-  for (const candidate of ["python3.11", "python3.10", "python3.12", "python3"]) {
-    if (commandSupportsPython310(candidate)) {
+  for (const candidate of ["python3.11", "python3.12", "python3"]) {
+    if (commandSupportsPython311(candidate)) {
       return candidate;
     }
   }
