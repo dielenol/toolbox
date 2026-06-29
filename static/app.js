@@ -5,7 +5,7 @@ import {
   modelProfiles,
   presetHelps,
   presets,
-} from "./js/config.js";
+} from "./js/config.js?v=17";
 import { el, getIcoSizeInputs, getSelectedIcoSizes } from "./js/elements.js";
 import {
   buildBulkArchiveName,
@@ -1657,7 +1657,6 @@ function applyPreset(name) {
   alphaMatting.checked = preset.alphaMatting;
   postProcess.checked = preset.postProcess;
   foregroundRefine.checked = preset.foregroundRefine;
-  selectModelValue(modelSelect, preset.modelName);
   updateModelHelp();
   edgeFeather.value = preset.edgeFeather;
   erodeSize.value = preset.erodeSize;
@@ -1679,7 +1678,6 @@ function applyBulkPreset(name) {
   bulkAlphaMatting.checked = preset.alphaMatting;
   bulkPostProcess.checked = preset.postProcess;
   bulkForegroundRefine.checked = preset.foregroundRefine;
-  selectModelValue(bulkModelSelect, preset.modelName);
   updateBulkModelHelp();
   bulkEdgeFeather.value = preset.edgeFeather;
   bulkErodeSize.value = preset.erodeSize;
@@ -1819,6 +1817,9 @@ function setModelCatalog(payload, { preserveSelection = true } = {}) {
   defaultModelName = payload.default || defaultModelName;
   modelGroups = normalizeModelGroups(payload);
   modelInfoById = new Map();
+  for (const model of payload.models || []) {
+    modelInfoById.set(model.id, model);
+  }
   for (const group of modelGroups) {
     for (const model of group.models || []) {
       modelInfoById.set(model.id, model);
@@ -1834,9 +1835,6 @@ function setModelCatalog(payload, { preserveSelection = true } = {}) {
 function normalizeModelGroups(payload) {
   if (Array.isArray(payload.groups) && payload.groups.length) {
     return payload.groups;
-  }
-  if (Array.isArray(payload.models) && payload.models.length) {
-    return [{ id: "models", name: "모델", models: payload.models }];
   }
   return fallbackModelGroups;
 }
@@ -1861,16 +1859,20 @@ function populateModelSelect(select, selectedModel) {
 }
 
 function selectModelValue(select, modelName) {
-  if (modelName && modelInfoById.has(modelName)) {
+  if (modelName && selectHasOption(select, modelName)) {
     select.value = modelName;
     return;
   }
-  if (modelInfoById.has(defaultModelName)) {
+  if (selectHasOption(select, defaultModelName)) {
     select.value = defaultModelName;
     return;
   }
   const firstModel = modelGroups.flatMap((group) => group.models || [])[0];
   if (firstModel) select.value = firstModel.id;
+}
+
+function selectHasOption(select, value) {
+  return Array.from(select.options).some((option) => option.value === value);
 }
 
 function formatModelDescription(info, fallback) {

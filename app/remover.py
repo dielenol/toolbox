@@ -44,36 +44,36 @@ MODEL_CATALOG = (
     ModelSpec(
         id=BIREFNET_MODEL,
         name="BiRefNet HQ",
-        profile="만능 최고 품질",
-        description="복잡한 배경, 제품 윤곽, 머리카락까지 가장 정밀하게 처리하는 기본 최고 품질 모델입니다.",
+        profile="범용 최고",
+        description="사진, 제품, 머리카락처럼 용도가 섞였을 때 가장 먼저 쓰는 최고 품질 선택입니다.",
         engine="transformers",
     ),
     ModelSpec(
         id="birefnet-massive",
         name="BiRefNet Massive",
-        profile="캐릭터/복잡 경계",
-        description="캐릭터, 피규어, 복잡한 실루엣처럼 경계가 많은 이미지에 우선 시도할 고품질 모델입니다.",
+        profile="캐릭터 최고",
+        description="캐릭터, 피규어, 복잡한 실루엣처럼 경계가 많은 이미지에서 먼저 고를 선택입니다.",
         engine="rembg",
     ),
     ModelSpec(
         id="birefnet-hrsod",
         name="BiRefNet HRSOD",
-        profile="로고/제품 윤곽",
-        description="고해상도 피사체와 선명한 제품/로고 윤곽을 따야 할 때 맞는 고품질 모델입니다.",
+        profile="로고/제품 최고",
+        description="로고, 제품, 선명한 물체 윤곽처럼 경계가 또렷해야 하는 이미지에서 먼저 고를 선택입니다.",
         engine="rembg",
     ),
     ModelSpec(
         id="birefnet-portrait",
         name="BiRefNet Portrait",
-        profile="인물/프로필",
-        description="사람 중심 이미지와 프로필 사진에 맞춘 모델입니다.",
+        profile="인물 최고",
+        description="사람 중심 이미지, 프로필, 상반신 사진에서 먼저 고를 선택입니다.",
         engine="rembg",
     ),
     ModelSpec(
         id="isnet-anime",
         name="ISNet Anime",
-        profile="애니/일러스트",
-        description="애니메이션, 일러스트, 2D 캐릭터 이미지에 맞춘 모델입니다.",
+        profile="애니 최고",
+        description="애니메이션, 일러스트, 2D 캐릭터 이미지에서 먼저 고를 선택입니다.",
         engine="rembg",
     ),
     ModelSpec(
@@ -94,8 +94,8 @@ MODEL_CATALOG = (
     ModelSpec(
         id="birefnet-general-lite",
         name="BiRefNet General Lite",
-        profile="가벼운 고품질",
-        description="BiRefNet 계열 중 상대적으로 가벼운 모델입니다. 벌크 작업에서 품질과 속도 균형이 필요할 때 쓰세요.",
+        profile="벌크 최고",
+        description="여러 장을 처리할 때 품질과 속도 균형이 가장 무난한 선택입니다.",
         engine="rembg",
     ),
     ModelSpec(
@@ -137,27 +137,14 @@ MODEL_CATALOG = (
 MODEL_GROUPS = (
     (
         "recommended",
-        "목적별 추천",
+        "목적별 최고 추천",
         (
             BIREFNET_MODEL,
             "birefnet-massive",
             "birefnet-hrsod",
             "birefnet-portrait",
             "isnet-anime",
-            "bria-rmbg",
-        ),
-    ),
-    (
-        "general",
-        "일반/벌크 후보",
-        (
-            "birefnet-general",
             "birefnet-general-lite",
-            "isnet-general-use",
-            "u2net_human_seg",
-            "u2net",
-            "u2netp",
-            "silueta",
         ),
     ),
 )
