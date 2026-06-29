@@ -42,6 +42,14 @@ select {
   font: inherit;
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(223, 180, 75, 0.9);
+  outline-offset: 2px;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -384,6 +392,191 @@ select {
   background: #ffffff;
 }
 
+select.native-select-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.model-picker {
+  position: relative;
+  z-index: 2;
+}
+
+.model-picker.open {
+  z-index: 50;
+}
+
+.model-picker-button {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  width: 100%;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(47, 116, 114, 0.06), rgba(255, 255, 255, 0) 78%),
+    #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.model-picker-button:hover,
+.model-picker.open .model-picker-button {
+  border-color: rgba(47, 116, 114, 0.52);
+  box-shadow: 0 0 0 3px rgba(47, 116, 114, 0.08);
+}
+
+.model-picker-button:focus-visible,
+.model-picker-option:focus-visible {
+  outline: 2px solid rgba(223, 180, 75, 0.9);
+  outline-offset: 2px;
+}
+
+.model-picker-title {
+  grid-column: 1;
+  color: var(--ink);
+  font-size: 0.98rem;
+  font-weight: 850;
+  line-height: 1.22;
+}
+
+.model-picker-detail {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.model-picker-meta {
+  grid-column: 1;
+  color: var(--teal-dark);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.model-picker-chevron {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  color: var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 140ms ease;
+}
+
+.model-picker.open .model-picker-chevron {
+  transform: rotate(225deg) translate(-2px, -1px);
+}
+
+.model-picker-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  max-height: min(420px, calc(100vh - 140px));
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid rgba(217, 223, 220, 0.95);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 22px 54px rgba(31, 42, 46, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.model-picker-group + .model-picker-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.model-picker-group-label {
+  padding: 4px 6px 8px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.model-picker-option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  width: 100%;
+  min-height: 74px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.model-picker-option:hover,
+.model-picker-option:focus-visible {
+  background: rgba(47, 116, 114, 0.07);
+}
+
+.model-picker-option[aria-selected="true"] {
+  border-color: rgba(47, 116, 114, 0.42);
+  background: rgba(47, 116, 114, 0.11);
+}
+
+.model-picker-option-title {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 850;
+  line-height: 1.22;
+}
+
+.model-picker-option-detail {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.model-picker-option-model {
+  grid-column: 1;
+  color: var(--teal-dark);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.model-picker-check {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  width: 15px;
+  height: 9px;
+  border-bottom: 2px solid var(--teal);
+  border-left: 2px solid var(--teal);
+  opacity: 0;
+  transform: rotate(-45deg);
+}
+
+.model-picker-option[aria-selected="true"] .model-picker-check {
+  opacity: 1;
+}
+
 .segmented {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -400,6 +593,12 @@ select {
   color: var(--muted);
   background: transparent;
   cursor: pointer;
+  font-weight: 800;
+}
+
+.segment:hover:not(.active) {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .segment.active {

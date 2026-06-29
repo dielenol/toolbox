@@ -5,7 +5,7 @@ import {
   modelProfiles,
   presetHelps,
   presets,
-} from "./js/config.js?v=17";
+} from "./js/config.js?v=18";
 import { el, getIcoSizeInputs, getSelectedIcoSizes } from "./js/elements.js";
 import {
   buildBulkArchiveName,
@@ -195,6 +195,7 @@ let activeProgressToken = null;
 let defaultModelName = "birefnet-hq";
 let modelGroups = fallbackModelGroups;
 let modelInfoById = new Map();
+const customModelSelects = new Map();
 
 init();
 
@@ -206,6 +207,7 @@ function init() {
   bindBulkEvents();
   bindWebpEvents();
   bindConvertEvents();
+  bindCustomModelPickerEvents();
   setModelCatalog({ default: defaultModelName, groups: fallbackModelGroups }, { preserveSelection: false });
   applyPreset("ultra");
   applyBulkPreset("ultra");
@@ -339,6 +341,7 @@ function bindCutoutEvents() {
 
   modelSelect.addEventListener("change", () => {
     updateModelHelp();
+    syncCustomModelSelect(modelSelect);
   });
 
   for (const input of [edgeFeather, erodeSize, foregroundThreshold, backgroundThreshold]) {
@@ -357,7 +360,10 @@ function bindBulkEvents() {
     button.addEventListener("click", () => applyBulkPreset(button.dataset.bulkPreset));
   });
 
-  bulkModelSelect.addEventListener("change", updateBulkModelHelp);
+  bulkModelSelect.addEventListener("change", () => {
+    updateBulkModelHelp();
+    syncCustomModelSelect(bulkModelSelect);
+  });
 
   for (const input of [bulkEdgeFeather, bulkErodeSize, bulkForegroundThreshold, bulkBackgroundThreshold]) {
     input.addEventListener("input", refreshBulkLabels);
@@ -1830,6 +1836,8 @@ function setModelCatalog(payload, { preserveSelection = true } = {}) {
   populateModelSelect(bulkModelSelect, previousBulkModel);
   updateModelHelp();
   updateBulkModelHelp();
+  syncCustomModelSelect(modelSelect);
+  syncCustomModelSelect(bulkModelSelect);
 }
 
 function normalizeModelGroups(payload) {
@@ -1856,6 +1864,7 @@ function populateModelSelect(select, selectedModel) {
 
   select.replaceChildren(fragment);
   selectModelValue(select, selectedModel || defaultModelName);
+  syncCustomModelSelect(select);
 }
 
 function selectModelValue(select, modelName) {
@@ -1873,6 +1882,248 @@ function selectModelValue(select, modelName) {
 
 function selectHasOption(select, value) {
   return Array.from(select.options).some((option) => option.value === value);
+}
+
+function bindCustomModelPickerEvents() {
+  document.addEventListener("click", (event) => {
+    for (const control of customModelSelects.values()) {
+      if (!control.root.contains(event.target)) {
+        closeCustomModelSelect(control);
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const control of customModelSelects.values()) {
+      if (control.isOpen) {
+        closeCustomModelSelect(control);
+        control.button.focus();
+      }
+    }
+  });
+}
+
+function ensureCustomModelSelect(select) {
+  const existing = customModelSelects.get(select);
+  if (existing) return existing;
+
+  const root = document.createElement("div");
+  root.className = "model-picker";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "model-picker-button";
+  button.setAttribute("aria-haspopup", "listbox");
+  button.setAttribute("aria-expanded", "false");
+
+  const title = document.createElement("span");
+  title.className = "model-picker-title";
+
+  const detail = document.createElement("span");
+  detail.className = "model-picker-detail";
+
+  const meta = document.createElement("span");
+  meta.className = "model-picker-meta";
+
+  const chevron = document.createElement("span");
+  chevron.className = "model-picker-chevron";
+  chevron.setAttribute("aria-hidden", "true");
+
+  button.append(title, detail, meta, chevron);
+
+  const menu = document.createElement("div");
+  menu.className = "model-picker-menu";
+  menu.hidden = true;
+
+  const list = document.createElement("div");
+  list.id = `${select.id}PickerList`;
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", select.getAttribute("aria-label") || "모델 선택");
+  menu.append(list);
+  button.setAttribute("aria-controls", list.id);
+
+  root.append(button, menu);
+  select.after(root);
+  select.classList.add("native-select-hidden");
+  select.tabIndex = -1;
+  select.setAttribute("aria-hidden", "true");
+
+  const control = {
+    button,
+    detail,
+    isOpen: false,
+    list,
+    menu,
+    meta,
+    root,
+    select,
+    title,
+  };
+  customModelSelects.set(select, control);
+
+  button.addEventListener("click", () => {
+    toggleCustomModelSelect(control);
+  });
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    openCustomModelSelect(control);
+    focusModelOption(control, event.key === "ArrowUp" ? "last" : "selected");
+  });
+
+  list.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-model-option]");
+    if (!option) return;
+    chooseCustomModelOption(control, option.dataset.modelOption);
+  });
+  list.addEventListener("keydown", (event) => {
+    handleModelOptionKeydown(control, event);
+  });
+
+  return control;
+}
+
+function syncCustomModelSelect(select) {
+  const control = ensureCustomModelSelect(select);
+  const selectedInfo = getModelInfo(select.value);
+  control.title.textContent = selectedInfo.profile;
+  control.detail.textContent = selectedInfo.description;
+  control.meta.textContent = selectedInfo.name;
+  control.button.setAttribute("aria-label", `${selectedInfo.profile} 모델 선택`);
+
+  renderCustomModelOptions(control);
+}
+
+function renderCustomModelOptions(control) {
+  const fragment = document.createDocumentFragment();
+  for (const group of modelGroups) {
+    const groupElement = document.createElement("div");
+    groupElement.className = "model-picker-group";
+
+    const label = document.createElement("div");
+    label.className = "model-picker-group-label";
+    label.textContent = group.name;
+    groupElement.append(label);
+
+    for (const model of group.models || []) {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "model-picker-option";
+      option.dataset.modelOption = model.id;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(model.id === control.select.value));
+      option.tabIndex = -1;
+
+      const title = document.createElement("span");
+      title.className = "model-picker-option-title";
+      title.textContent = model.profile;
+
+      const detail = document.createElement("span");
+      detail.className = "model-picker-option-detail";
+      detail.textContent = model.description;
+
+      const meta = document.createElement("span");
+      meta.className = "model-picker-option-model";
+      meta.textContent = model.name;
+
+      const check = document.createElement("span");
+      check.className = "model-picker-check";
+      check.setAttribute("aria-hidden", "true");
+
+      option.append(title, detail, meta, check);
+      groupElement.append(option);
+    }
+
+    fragment.append(groupElement);
+  }
+
+  control.list.replaceChildren(fragment);
+}
+
+function getModelInfo(modelName) {
+  const model = modelInfoById.get(modelName);
+  if (model) return model;
+  const selectedOption = document.querySelector(`option[value="${CSS.escape(modelName)}"]`);
+  return {
+    description: selectedOption?.title || "이미지 성격에 맞는 배경 제거 모델을 선택합니다.",
+    name: selectedOption?.textContent || modelName,
+    profile: modelProfiles[modelName] || "사용자 선택",
+  };
+}
+
+function toggleCustomModelSelect(control) {
+  if (control.isOpen) {
+    closeCustomModelSelect(control);
+    return;
+  }
+  openCustomModelSelect(control);
+}
+
+function openCustomModelSelect(control) {
+  for (const otherControl of customModelSelects.values()) {
+    if (otherControl !== control) closeCustomModelSelect(otherControl);
+  }
+  control.isOpen = true;
+  control.root.classList.add("open");
+  control.menu.hidden = false;
+  control.button.setAttribute("aria-expanded", "true");
+  renderCustomModelOptions(control);
+}
+
+function closeCustomModelSelect(control) {
+  control.isOpen = false;
+  control.root.classList.remove("open");
+  control.menu.hidden = true;
+  control.button.setAttribute("aria-expanded", "false");
+}
+
+function chooseCustomModelOption(control, value) {
+  if (!value || control.select.value === value) {
+    closeCustomModelSelect(control);
+    control.button.focus();
+    return;
+  }
+  control.select.value = value;
+  control.select.dispatchEvent(new Event("change", { bubbles: true }));
+  closeCustomModelSelect(control);
+  control.button.focus();
+}
+
+function focusModelOption(control, target) {
+  const options = Array.from(control.list.querySelectorAll("[data-model-option]"));
+  if (!options.length) return;
+  let option = options.find((item) => item.dataset.modelOption === control.select.value) || options[0];
+  if (target === "first") option = options[0];
+  if (target === "last") option = options[options.length - 1];
+  option.focus();
+}
+
+function handleModelOptionKeydown(control, event) {
+  const options = Array.from(control.list.querySelectorAll("[data-model-option]"));
+  const currentIndex = options.indexOf(document.activeElement);
+  if (!options.length) return;
+
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    options[Math.min(currentIndex + 1, options.length - 1)].focus();
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    options[Math.max(currentIndex - 1, 0)].focus();
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    options[0].focus();
+  } else if (event.key === "End") {
+    event.preventDefault();
+    options[options.length - 1].focus();
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    chooseCustomModelOption(control, document.activeElement.dataset.modelOption);
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    closeCustomModelSelect(control);
+    control.button.focus();
+  }
 }
 
 function formatModelDescription(info, fallback) {
