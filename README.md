@@ -10,7 +10,7 @@
 - Frontend: `static/index.html`과 ES module JavaScript
 - Server entrypoint: `app.main:app`
 - 기본 URL: `http://127.0.0.1:8000`
-- Python: 3.10 이상 권장
+- Python: 3.10 또는 3.11 권장
 - Package manager: `pip`
 - Node/pnpm: 앱 런타임에는 필요하지 않습니다. 실행 단축 명령과 JS 문법 확인에만 선택적으로 씁니다.
 
@@ -18,13 +18,13 @@
 
 이미 가상환경과 패키지 설치가 끝난 뒤에는 프로젝트 루트에서 아래만 실행합니다.
 
-```powershell
+```bash
 pnpm dev
 ```
 
 pnpm이 없으면 npm으로도 실행할 수 있습니다.
 
-```powershell
+```bash
 npm run dev
 ```
 
@@ -32,11 +32,11 @@ npm run dev
 
 8000번 포트가 이미 사용 중이면 포트를 바꿉니다.
 
-```powershell
-pnpm dev -- -Port 8010
+```bash
+pnpm dev -- --port 8010
 ```
 
-PowerShell 스크립트를 직접 실행할 수도 있습니다.
+Windows PowerShell 사용자는 기존 PowerShell 스크립트를 직접 실행할 수도 있습니다.
 
 ```powershell
 .\scripts\dev.ps1
@@ -45,6 +45,17 @@ PowerShell 스크립트를 직접 실행할 수도 있습니다.
 ## 최초 1회 설치
 
 처음 받았거나 `.venv`를 새로 만드는 경우에만 실행합니다. 이미 설치가 끝났다면 이 섹션은 매번 반복하지 않아도 됩니다.
+
+macOS/Linux:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Windows PowerShell:
 
 ```powershell
 python -m venv .venv
@@ -64,7 +75,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ### Warp에서 `pnpm dev`가 안 켜질 때
 
-pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰거나 `.\scripts\dev.ps1`을 직접 실행하세요. Python 패키지 오류가 나면 먼저 최초 1회 설치 섹션의 `pip install -r requirements.txt`까지 끝냈는지 확인하세요.
+pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰세요. Python 패키지 오류가 나면 먼저 최초 1회 설치 섹션의 `pip install -r requirements.txt`까지 끝냈는지 확인하세요.
 
 ## 주요 기능
 
@@ -81,7 +92,7 @@ pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰거나 `.\scripts\dev.
 
 ## 요구 사항
 
-- Windows 로컬 실행 기준으로 작성되어 있습니다.
+- Windows/macOS/Linux 로컬 실행 기준으로 작성되어 있습니다.
 - 첫 배경 제거 실행 때 모델 파일을 내려받을 수 있으므로 인터넷 연결이 필요할 수 있습니다.
 - `BiRefNet HQ`는 CPU에서도 동작하지만 큰 이미지는 느릴 수 있습니다.
 - CUDA를 쓰려면 `requirements.txt`의 CPU PyTorch 구성 대신 환경에 맞는 PyTorch 설치가 필요합니다.
@@ -187,6 +198,12 @@ pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰거나 `.\scripts\dev.
 $env:TOOLBOX_MAX_UPLOAD_BYTES = "52428800"
 $env:TOOLBOX_TORCH_THREADS = "4"
 pnpm dev
+```
+
+macOS/Linux에서는 같은 설정을 아래처럼 지정합니다.
+
+```bash
+TOOLBOX_MAX_UPLOAD_BYTES=52428800 TOOLBOX_TORCH_THREADS=4 pnpm dev
 ```
 
 ## API
@@ -352,7 +369,7 @@ Get-ChildItem -Path static -Recurse -Filter *.js | ForEach-Object { node --check
 
 ### `pnpm dev`가 동작하지 않음
 
-`pnpm dev`는 루트의 `package.json`에서 `scripts/dev.ps1`을 호출합니다. pnpm이 없으면 `npm run dev` 또는 `.\scripts\dev.ps1`을 사용하세요.
+`pnpm dev`는 루트의 `package.json`에서 `scripts/dev.mjs`를 호출합니다. 이 스크립트는 macOS/Linux에서는 `.venv/bin/python`, Windows에서는 `.venv\Scripts\python.exe`를 우선 사용하고, 가상환경이 없으면 `PYTHON` 환경 변수 또는 시스템 Python을 사용합니다. pnpm이 없으면 `npm run dev`를 사용하세요.
 
 ### 브라우저에서 서버 확인 필요로 표시됨
 
