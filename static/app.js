@@ -35,6 +35,8 @@ import {
   showProgress,
 } from "./js/ui.js";
 
+const MODEL_PREP_NOTICE_DELAY_MS = 8000;
+
 const {
   apiStatus,
   tabButtons,
@@ -547,6 +549,7 @@ async function processImage() {
   if (!selectedFile) return;
 
   const file = selectedFile;
+  const modelName = modelSelect.value;
   const requestId = cutoutRequestId + 1;
   const progressToken = `cutout-${requestId}`;
   cutoutRequestId = requestId;
@@ -558,15 +561,19 @@ async function processImage() {
   showJobProgress(
     progressToken,
     "누끼 따는 중",
-    isHeavyRemoveModel(modelSelect.value)
-      ? `${getModelLabel(modelSelect.value)}로 가장자리를 계산하고 있습니다. 큰 이미지는 조금 걸릴 수 있어요.`
-      : "배경 마스크를 만들고 가장자리를 정리하고 있습니다.",
+    buildRemoveProgressDetail(modelName),
   );
+  const modelPrepNoticeTimer = window.setTimeout(() => {
+    if (!isCurrentCutoutRequest(requestId, file)) return;
+    const detail = buildModelPreparationDetail(modelName);
+    stageMeta.textContent = detail;
+    showJobProgress(progressToken, "모델 준비 중", detail);
+  }, MODEL_PREP_NOTICE_DELAY_MS);
   syncFloatingActions();
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("model_name", modelSelect.value);
+  formData.append("model_name", modelName);
   formData.append("alpha_matting", String(alphaMatting.checked));
   formData.append("post_process_mask", String(postProcess.checked));
   formData.append("foreground_refine", String(foregroundRefine.checked));
@@ -613,6 +620,7 @@ async function processImage() {
     resultMeta.textContent = "오류";
     stageMeta.textContent = error.message;
   } finally {
+    window.clearTimeout(modelPrepNoticeTimer);
     hideJobProgress(progressToken);
     if (activeCutoutRequestId === requestId) {
       activeCutoutRequestId = 0;
@@ -719,6 +727,7 @@ async function processBulkImages() {
   const progressToken = `bulk-${requestId}`;
   const options = getBulkRemoveOptions();
   const results = [];
+  let completedFirstBulkItem = false;
   bulkRequestId = requestId;
   activeBulkRequestId = requestId;
   bulkArchiveBlob = null;
@@ -740,7 +749,17 @@ async function processBulkImages() {
   bulkStageTitle.textContent = "벌크 처리 중";
   bulkResultMeta.textContent = `0 / ${bulkItems.length}`;
   renderBulkQueue();
-  showJobProgress(progressToken, "벌크 누끼 처리 중", `1 / ${bulkItems.length} 이미지를 준비하고 있습니다.`);
+  showJobProgress(
+    progressToken,
+    "벌크 누끼 처리 중",
+    buildBulkRemoveProgressDetail(options.modelName, 1, bulkItems.length),
+  );
+  const modelPrepNoticeTimer = window.setTimeout(() => {
+    if (!isCurrentBulkRequest(requestId) || completedFirstBulkItem) return;
+    const detail = buildModelPreparationDetail(options.modelName);
+    bulkStageMeta.textContent = detail;
+    showJobProgress(progressToken, "모델 준비 중", detail);
+  }, MODEL_PREP_NOTICE_DELAY_MS);
   syncFloatingActions();
 
   try {
@@ -751,7 +770,11 @@ async function processBulkImages() {
       item.statusLabel = "처리 중";
       item.detail = `${index + 1} / ${bulkItems.length} · 모델 실행`;
       bulkResultMeta.textContent = `${index} / ${bulkItems.length}`;
-      showJobProgress(progressToken, "벌크 누끼 처리 중", `${index + 1} / ${bulkItems.length} · ${item.file.name}`);
+      showJobProgress(
+        progressToken,
+        "벌크 누끼 처리 중",
+        buildBulkRemoveProgressDetail(options.modelName, index + 1, bulkItems.length, item.file.name),
+      );
       renderBulkQueue();
 
       try {
@@ -779,6 +802,7 @@ async function processBulkImages() {
         item.statusLabel = "실패";
         item.detail = error.message;
       }
+      if (index === 0) completedFirstBulkItem = true;
 
       bulkResultMeta.textContent = `${index + 1} / ${bulkItems.length}`;
       renderBulkQueue();
@@ -806,6 +830,7 @@ async function processBulkImages() {
     bulkStageMeta.textContent = error.message;
     bulkResultMeta.textContent = "오류";
   } finally {
+    window.clearTimeout(modelPrepNoticeTimer);
     hideJobProgress(progressToken);
     if (activeBulkRequestId === requestId) {
       activeBulkRequestId = 0;
@@ -2138,6 +2163,31 @@ function getModelLabel(modelName) {
 
 function isHeavyRemoveModel(modelName) {
   return modelName.startsWith("birefnet") || modelName === "bria-rmbg";
+}
+
+function buildRemoveProgressDetail(modelName) {
+  if (!isHeavyRemoveModel(modelName)) {
+    return "배경 마스크를 만들고 가장자리를 정리하고 있습니다.";
+  }
+  return [
+    `${getModelLabel(modelName)}로 가장자리를 계산하고 있습니다.`,
+    "첫 사용이면 모델 파일 다운로드가 먼저 진행될 수 있습니다.",
+  ].join(" ");
+}
+
+function buildBulkRemoveProgressDetail(modelName, current, total, fileName = "이미지를 준비하고 있습니다.") {
+  const target = fileName ? fileName : "이미지를 준비하고 있습니다.";
+  const warmup = isHeavyRemoveModel(modelName)
+    ? " · 첫 사용이면 모델 다운로드가 먼저 진행될 수 있습니다."
+    : "";
+  return `${current} / ${total} · ${target}${warmup}`;
+}
+
+function buildModelPreparationDetail(modelName) {
+  return [
+    `${getModelLabel(modelName)} 모델 파일을 준비하고 있습니다.`,
+    "첫 실행 또는 새 모델 선택이면 수백 MB에서 1GB 정도의 다운로드가 걸릴 수 있습니다.",
+  ].join(" ");
 }
 
 function showJobProgress(token, title, detail) {

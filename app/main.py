@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
@@ -34,6 +35,7 @@ from app.remover import (
 from app.settings import MAX_UPLOAD_BYTES
 
 
+logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
@@ -121,6 +123,9 @@ async def remove_endpoint(
         raise HTTPException(status_code=413, detail=str(exc)) from exc
     except UnsupportedModelError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Background removal failed with model %s", options.model_name)
+        raise HTTPException(status_code=500, detail=_model_runtime_error(options.model_name)) from exc
 
     filename = _output_filename(file.filename)
     return Response(
@@ -133,6 +138,15 @@ async def remove_endpoint(
             "X-Model": result.model_name,
             "X-Process-Time-Ms": str(result.elapsed_ms),
         },
+    )
+
+
+def _model_runtime_error(model_name: str) -> str:
+    label = MODEL_BY_ID.get(model_name)
+    model_label = label.name if label else model_name
+    return (
+        f"{model_label} 모델 실행에 실패했습니다. 첫 실행이면 모델 파일 다운로드가 오래 걸리거나 "
+        "중간에 끊겼을 수 있습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요."
     )
 
 
