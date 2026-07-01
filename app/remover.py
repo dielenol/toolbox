@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 
-from PIL import Image, ImageChops, ImageFilter, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageFilter, UnidentifiedImageError
 from rembg import new_session, remove
 
+from app.image_orientation import normalize_display_orientation
 from app.settings import (
     BIREFNET_INPUT_SIZE,
     BIREFNET_REPO,
@@ -320,8 +321,7 @@ def _load_image(contents: bytes) -> Image.Image:
     except (UnidentifiedImageError, OSError) as exc:
         raise InvalidImageError("이미지 파일을 읽을 수 없습니다.") from exc
 
-    image = ImageOps.exif_transpose(image)
-    return image
+    return normalize_display_orientation(image)
 
 
 def _flatten_for_model(rgba: Image.Image) -> Image.Image:

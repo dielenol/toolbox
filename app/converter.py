@@ -5,8 +5,9 @@ import time
 from dataclasses import dataclass
 from io import BytesIO
 
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 
+from app.image_orientation import normalize_display_orientation
 from app.settings import MAX_PIXELS
 
 
@@ -127,8 +128,7 @@ def _load_image(contents: bytes) -> Image.Image:
     except (UnidentifiedImageError, OSError) as exc:
         raise InvalidImageError("이미지 파일을 읽을 수 없습니다.") from exc
 
-    image = ImageOps.exif_transpose(image)
-    return image
+    return normalize_display_orientation(image)
 
 
 def _prepare_for_format(image: Image.Image, output_format: str, background_color: str) -> Image.Image:
