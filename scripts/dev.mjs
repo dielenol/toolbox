@@ -97,6 +97,11 @@ for (let index = 0; index < rawArgs.length; index += 1) {
   passthroughArgs.push(arg);
 }
 
+if (!["127.0.0.1", "localhost", "::1"].includes(host.toLowerCase())) {
+  console.error("Toolbox only binds to a loopback host (127.0.0.1, localhost, or ::1).");
+  process.exit(1);
+}
+
 const child = spawn(
   python,
   [

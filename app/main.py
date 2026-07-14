@@ -7,6 +7,8 @@ from urllib.parse import quote
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.requests import Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -33,6 +35,8 @@ from app.remover import (
     remove_background,
 )
 from app.settings import MAX_UPLOAD_BYTES
+from app.security import classify_api_origin, valid_pairing_token
+from app.settings import LIFE_OS_ORIGINS, PAIRING_TOKEN
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +44,53 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Toolbox", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(LIFE_OS_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Life-OS-Token"],
+    expose_headers=[
+        "Content-Disposition",
+        "X-Image-Width",
+        "X-Image-Height",
+        "X-Model",
+        "X-Output-Format",
+        "X-Process-Time-Ms",
+        "X-Archive-Count",
+    ],
+)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.middleware("http")
+async def protect_cross_origin_api(request: Request, call_next):
+    if not request.url.path.startswith("/api/") or request.method == "OPTIONS":
+        return await call_next(request)
+
+    own_origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    request_kind = classify_api_origin(
+        request.headers.get("origin"),
+        own_origin,
+        LIFE_OS_ORIGINS,
+    )
+
+    if request_kind == "rejected":
+        return JSONResponse(status_code=403, content={"detail": "허용되지 않은 origin입니다."})
+
+    if request_kind == "life-os" and not valid_pairing_token(
+        request.headers.get("x-life-os-token"),
+        PAIRING_TOKEN,
+    ):
+        status_code = 503 if len(PAIRING_TOKEN) < 16 else 401
+        detail = (
+            "TOOLBOX_PAIRING_TOKEN이 설정되지 않았습니다."
+            if status_code == 503
+            else "페어링 토큰이 올바르지 않습니다."
+        )
+        return JSONResponse(status_code=status_code, content={"detail": detail})
+
+    return await call_next(request)
 
 
 @app.get("/", include_in_schema=False)

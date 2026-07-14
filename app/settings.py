@@ -15,6 +15,13 @@ def get_env_str(name: str, default: str, *, legacy: tuple[str, ...] = ()) -> str
     return default
 
 
+def get_env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = os.getenv(name)
+    if raw_value in (None, ""):
+        return default
+    return tuple(value.strip().rstrip("/") for value in raw_value.split(",") if value.strip())
+
+
 def get_env_int(
     name: str,
     default: int,
@@ -99,3 +106,8 @@ MAX_UPLOAD_BYTES = get_env_int(
     legacy=("NUKKI_MAX_UPLOAD_BYTES",),
     minimum=1,
 )
+LIFE_OS_ORIGINS = get_env_list(
+    "TOOLBOX_LIFE_OS_ORIGINS",
+    ("http://localhost:3000", "http://127.0.0.1:3000"),
+)
+PAIRING_TOKEN = os.getenv("TOOLBOX_PAIRING_TOKEN", "")

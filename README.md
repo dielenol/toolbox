@@ -191,6 +191,8 @@ pnpm이 설치되어 있지 않으면 `npm run dev`를 쓰세요. Python 패키�
 | `TOOLBOX_TORCH_THREADS` | `0` | CPU 추론용 PyTorch 스레드 수. 0이면 기본값 사용 |
 | `TOOLBOX_MAX_PIXELS` | `80000000` | 허용할 최대 픽셀 수 |
 | `TOOLBOX_MAX_UPLOAD_BYTES` | `104857600` | 허용할 최대 업로드 파일 크기 |
+| `TOOLBOX_LIFE_OS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | 접근을 허용할 정확한 Life OS origin 목록 |
+| `TOOLBOX_PAIRING_TOKEN` | 없음 | Life OS의 cross-origin 요청에 필요한 16자 이상 로컬 토큰 |
 
 잘못된 숫자 설정값은 앱을 즉시 중단하지 않고 기본값으로 되돌립니다.
 
@@ -205,6 +207,20 @@ macOS/Linux에서는 같은 설정을 아래처럼 지정합니다.
 ```bash
 TOOLBOX_MAX_UPLOAD_BYTES=52428800 TOOLBOX_TORCH_THREADS=4 pnpm dev
 ```
+
+### Life OS 연결
+
+Toolbox는 loopback(`127.0.0.1`, `localhost`, `::1`)에만 바인딩됩니다. 배포된 Life OS에서 연결할 때는 정확한 origin과 임의의 긴 토큰을 로컬 환경에만 설정하세요.
+
+```bash
+TOOLBOX_LIFE_OS_ORIGINS=https://your-life-os.example.com \
+TOOLBOX_PAIRING_TOKEN=replace-with-a-random-32-byte-token \
+pnpm dev
+```
+
+같은 토큰을 Life OS의 도구 화면에 한 번 입력하면 브라우저의 localStorage에만 저장되고 Life OS 서버에는 전송되지 않습니다. 기존 `http://127.0.0.1:8000` UI는 토큰 없이 그대로 사용할 수 있습니다.
+
+Chrome 142 이상에서는 처음 연결할 때 로컬 네트워크 접근 권한을 묻습니다. Life OS에서 연결 확인 버튼을 누른 뒤 loopback 접근을 허용해야 하며, 이는 과거 Private Network Access preflight가 아니라 Chrome의 [Local Network Access 권한](https://developer.chrome.com/blog/local-network-access)입니다.
 
 ## API
 
