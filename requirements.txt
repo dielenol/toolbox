@@ -1,8 +1,9 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
+filelock==3.29.4
 Pillow==12.1.0
-rembg==2.0.76
+rembg==2.0.77
 onnxruntime==1.20.1
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.5.1+cpu ; platform_system != "Darwin"

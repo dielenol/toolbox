@@ -58,106 +58,29 @@
         <section class="control-group" aria-labelledby="modelLabel">
           <div class="group-head">
             <h2 id="modelLabel">모델</h2>
-            <span id="modelProfile">범용 최고</span>
+            <span id="modelProfile">투명/디자인 최고</span>
           </div>
           <select id="modelSelect" aria-label="모델 선택">
-            <optgroup label="목적별 최고 추천">
-              <option value="birefnet-hq" selected>범용 최고 - 사진/제품/머리카락</option>
-              <option value="birefnet-massive">캐릭터 최고 - 피규어/복잡한 실루엣</option>
-              <option value="birefnet-hrsod">로고/제품 최고 - 선명한 윤곽</option>
-              <option value="birefnet-portrait">인물 최고 - 프로필/상반신</option>
-              <option value="isnet-anime">애니 최고 - 일러스트/2D 캐릭터</option>
-              <option value="birefnet-general-lite">벌크 최고 - 여러 장 고품질</option>
+            <optgroup label="목적별 최고 품질">
+              <option value="lucida" selected>투명/디자인 최고 - Lucida</option>
+              <option value="birefnet-hr-matting">인물/머리카락 최고 - BiRefNet HR Matting</option>
+              <option value="birefnet-hr">제품/고해상도 최고 - BiRefNet HR</option>
+              <option value="isnet-anime">2D 애니 최고 - ISNet Anime</option>
             </optgroup>
           </select>
           <p class="helper-text" id="modelHelp">
-            사진, 제품, 머리카락처럼 용도가 섞였을 때 가장 먼저 쓰는 최고 품질 선택입니다.
+            투명 소재, 로고와 글자, 일러스트, 발광 효과, 위장 배경을 가장 정밀하게 보존합니다.
           </p>
         </section>
 
-        <section class="control-group" aria-labelledby="qualityLabel">
+        <section class="control-group" aria-labelledby="qualityPolicyLabel">
           <div class="group-head">
-            <h2 id="qualityLabel">품질</h2>
-            <span id="qualityMode">Ultra</span>
-          </div>
-          <div class="segmented" role="group" aria-label="품질 프리셋">
-            <button type="button" class="segment active" data-preset="ultra">Ultra</button>
-            <button type="button" class="segment" data-preset="studio">Studio</button>
-            <button type="button" class="segment" data-preset="balanced">Balanced</button>
-            <button type="button" class="segment" data-preset="fast">Fast</button>
-          </div>
-          <p class="helper-text" id="presetHelp">
-            선택한 목적별 모델을 유지한 채 가장 정밀한 보정 옵션을 씁니다.
-          </p>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>머리카락/반투명 보정</strong>
-              <small>얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.</small>
-            </span>
-            <input id="alphaMatting" type="checkbox" checked />
-          </label>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>마스크 정리</strong>
-              <small>배경에 남은 점이나 작은 구멍을 정리합니다. 얇은 선이 사라지면 꺼보세요.</small>
-            </span>
-            <input id="postProcess" type="checkbox" checked />
-          </label>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>테두리 색 번짐 제거</strong>
-              <small>흰 배경, 초록 배경 같은 기존 배경색이 가장자리에 묻는 현상을 줄입니다.</small>
-            </span>
-            <input id="foregroundRefine" type="checkbox" checked />
-          </label>
-        </section>
-
-        <section class="control-group" aria-labelledby="edgeLabel">
-          <div class="group-head">
-            <h2 id="edgeLabel">엣지</h2>
-            <span id="edgeValue">0.1px</span>
+            <h2 id="qualityPolicyLabel">품질 정책</h2>
+            <span>Maximum</span>
           </div>
           <p class="helper-text">
-            결과물 가장자리 모양을 다듬습니다. 처음에는 기본값으로 두고, 테두리가 거칠 때만 조금씩 조정하세요.
+            속도·Lite·저품질 프리셋과 수동 임계값을 제공하지 않습니다. 모든 모델은 고정된 최고 해상도와 정밀 보정으로만 실행됩니다.
           </p>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>부드럽게</strong>
-              <small id="featherHelp">낮음: 경계를 선명하게 유지합니다.</small>
-            </span>
-            <input id="edgeFeather" type="range" min="0" max="2" step="0.1" value="0.1" />
-          </label>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>안쪽으로 줄이기</strong>
-              <small id="erodeHelp">약함: 원래 윤곽을 거의 그대로 둡니다.</small>
-            </span>
-            <input id="erodeSize" type="range" min="0" max="20" step="1" value="4" />
-          </label>
-        </section>
-
-        <section class="control-group" aria-labelledby="thresholdLabel">
-          <div class="group-head">
-            <h2 id="thresholdLabel">임계값</h2>
-            <span id="thresholdValue">240 / 10</span>
-          </div>
-          <p class="helper-text">
-            Alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 건드리지 않아도 됩니다.
-          </p>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>피사체 확신</strong>
-              <small id="foregroundHelp">높음: 확실한 피사체만 또렷하게 잡습니다.</small>
-            </span>
-            <input id="foregroundThreshold" type="range" min="1" max="255" step="1" value="240" />
-          </label>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>배경 확신</strong>
-              <small id="backgroundHelp">낮음: 배경으로 확실한 부분만 제거합니다.</small>
-            </span>
-            <input id="backgroundThreshold" type="range" min="0" max="254" step="1" value="10" />
-          </label>
         </section>
 
         <div class="action-row" id="cutoutActionRow">
@@ -218,101 +141,29 @@
         <section class="control-group" aria-labelledby="bulkModelLabel">
           <div class="group-head">
             <h2 id="bulkModelLabel">모델</h2>
-            <span id="bulkModelProfile">범용 최고</span>
+            <span id="bulkModelProfile">투명/디자인 최고</span>
           </div>
           <select id="bulkModelSelect" aria-label="벌크누끼 모델 선택">
-            <optgroup label="목적별 최고 추천">
-              <option value="birefnet-hq" selected>범용 최고 - 사진/제품/머리카락</option>
-              <option value="birefnet-massive">캐릭터 최고 - 피규어/복잡한 실루엣</option>
-              <option value="birefnet-hrsod">로고/제품 최고 - 선명한 윤곽</option>
-              <option value="birefnet-portrait">인물 최고 - 프로필/상반신</option>
-              <option value="isnet-anime">애니 최고 - 일러스트/2D 캐릭터</option>
-              <option value="birefnet-general-lite">벌크 최고 - 여러 장 고품질</option>
+            <optgroup label="목적별 최고 품질">
+              <option value="lucida" selected>투명/디자인 최고 - Lucida</option>
+              <option value="birefnet-hr-matting">인물/머리카락 최고 - BiRefNet HR Matting</option>
+              <option value="birefnet-hr">제품/고해상도 최고 - BiRefNet HR</option>
+              <option value="isnet-anime">2D 애니 최고 - ISNet Anime</option>
             </optgroup>
           </select>
           <p class="helper-text" id="bulkModelHelp">
-            사진, 제품, 머리카락처럼 용도가 섞였을 때 가장 먼저 쓰는 최고 품질 선택입니다.
+            투명 소재, 로고와 글자, 일러스트, 발광 효과, 위장 배경을 가장 정밀하게 보존합니다.
           </p>
         </section>
 
-        <section class="control-group" aria-labelledby="bulkQualityLabel">
+        <section class="control-group" aria-labelledby="bulkQualityPolicyLabel">
           <div class="group-head">
-            <h2 id="bulkQualityLabel">품질</h2>
-            <span id="bulkQualityMode">Ultra</span>
+            <h2 id="bulkQualityPolicyLabel">품질 정책</h2>
+            <span>Maximum</span>
           </div>
-          <div class="segmented" role="group" aria-label="벌크누끼 품질 프리셋">
-            <button type="button" class="segment bulk-segment active" data-bulk-preset="ultra">Ultra</button>
-            <button type="button" class="segment bulk-segment" data-bulk-preset="studio">Studio</button>
-            <button type="button" class="segment bulk-segment" data-bulk-preset="balanced">Balanced</button>
-            <button type="button" class="segment bulk-segment" data-bulk-preset="fast">Fast</button>
-          </div>
-          <p class="helper-text" id="bulkPresetHelp">
-            선택한 목적별 모델을 유지한 채 가장 정밀한 보정 옵션을 씁니다.
+          <p class="helper-text">
+            벌크 작업도 개별 작업과 동일하게 최고 해상도와 정밀 보정을 강제하며 속도 우선 경로를 제공하지 않습니다.
           </p>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>머리카락/반투명 보정</strong>
-              <small>얇은 머리카락, 털, 비치는 천 같은 가장자리를 더 자연스럽게 살립니다.</small>
-            </span>
-            <input id="bulkAlphaMatting" type="checkbox" checked />
-          </label>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>마스크 정리</strong>
-              <small>배경에 남은 점이나 작은 구멍을 정리합니다. 얇은 선이 사라지면 꺼보세요.</small>
-            </span>
-            <input id="bulkPostProcess" type="checkbox" checked />
-          </label>
-          <label class="toggle-row">
-            <span class="label-stack">
-              <strong>테두리 색 번짐 제거</strong>
-              <small>기존 배경색이 가장자리에 묻는 현상을 줄입니다.</small>
-            </span>
-            <input id="bulkForegroundRefine" type="checkbox" checked />
-          </label>
-        </section>
-
-        <section class="control-group" aria-labelledby="bulkEdgeLabel">
-          <div class="group-head">
-            <h2 id="bulkEdgeLabel">엣지</h2>
-            <span id="bulkEdgeValue">0.1px</span>
-          </div>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>부드럽게</strong>
-              <small id="bulkFeatherHelp">낮음: 경계를 선명하게 유지합니다.</small>
-            </span>
-            <input id="bulkEdgeFeather" type="range" min="0" max="2" step="0.1" value="0.1" />
-          </label>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>안쪽으로 줄이기</strong>
-              <small id="bulkErodeHelp">약함: 원래 윤곽을 거의 그대로 둡니다.</small>
-            </span>
-            <input id="bulkErodeSize" type="range" min="0" max="20" step="1" value="4" />
-          </label>
-        </section>
-
-        <section class="control-group" aria-labelledby="bulkThresholdLabel">
-          <div class="group-head">
-            <h2 id="bulkThresholdLabel">임계값</h2>
-            <span id="bulkThresholdValue">240 / 10</span>
-          </div>
-          <p class="helper-text">Alpha matting이 켜졌을 때 쓰는 기준값입니다. 애매하면 건드리지 않아도 됩니다.</p>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>피사체 확신</strong>
-              <small id="bulkForegroundHelp">높음: 확실한 피사체만 또렷하게 잡습니다.</small>
-            </span>
-            <input id="bulkForegroundThreshold" type="range" min="1" max="255" step="1" value="240" />
-          </label>
-          <label class="range-row">
-            <span class="label-stack">
-              <strong>배경 확신</strong>
-              <small id="bulkBackgroundHelp">낮음: 배경으로 확실한 부분만 제거합니다.</small>
-            </span>
-            <input id="bulkBackgroundThreshold" type="range" min="0" max="254" step="1" value="10" />
-          </label>
         </section>
 
         <div class="action-row" id="bulkActionRow">
@@ -600,6 +451,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=19" type="module"></script>
+    <script src="/static/app.js?v=20" type="module"></script>
   </body>
 </html>

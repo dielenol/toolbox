@@ -26,6 +26,7 @@ from app.remover import (
     MODEL_BY_ID,
     MODEL_GROUPS,
     SUPPORTED_MODELS,
+    TASK_CATALOG,
     ImageTooLargeError,
     InvalidImageError,
     RemoveOptions,
@@ -65,8 +66,10 @@ def models() -> dict[str, object]:
     ]
     return {
         "default": DEFAULT_MODEL,
+        "quality_policy": "maximum",
         "groups": groups,
         "models": [model.to_payload() for model in MODEL_BY_ID.values()],
+        "tasks": [task.to_payload() for task in TASK_CATALOG],
     }
 
 
@@ -89,31 +92,13 @@ def formats() -> dict[str, object]:
 async def remove_endpoint(
     file: UploadFile = File(...),
     model_name: str = Form(DEFAULT_MODEL),
-    alpha_matting: bool = Form(True),
-    post_process_mask: bool = Form(True),
-    foreground_refine: bool = Form(True),
-    foreground_threshold: int = Form(240),
-    background_threshold: int = Form(10),
-    erode_size: int = Form(10),
-    edge_feather: float = Form(0.4),
-    png_compression: int = Form(4),
 ) -> Response:
     if model_name not in SUPPORTED_MODELS:
         raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
 
     contents = await _read_upload(file)
 
-    options = RemoveOptions(
-        model_name=model_name,
-        alpha_matting=alpha_matting,
-        post_process_mask=post_process_mask,
-        foreground_refine=foreground_refine,
-        foreground_threshold=foreground_threshold,
-        background_threshold=background_threshold,
-        erode_size=erode_size,
-        edge_feather=edge_feather,
-        png_compression=png_compression,
-    )
+    options = RemoveOptions(model_name=model_name)
 
     try:
         result = await run_in_threadpool(remove_background, contents, options)
@@ -136,6 +121,7 @@ async def remove_endpoint(
             "X-Image-Width": str(result.width),
             "X-Image-Height": str(result.height),
             "X-Model": result.model_name,
+            "X-Quality-Policy": "maximum",
             "X-Process-Time-Ms": str(result.elapsed_ms),
         },
     )

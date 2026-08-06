@@ -4,9 +4,6 @@ import os
 import warnings
 
 
-DEFAULT_BIREFNET_REVISION = "e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4"
-
-
 def get_env_str(name: str, default: str, *, legacy: tuple[str, ...] = ()) -> str:
     for key in (name, *legacy):
         value = os.getenv(key)
@@ -62,24 +59,7 @@ def get_env_int(
     return value
 
 
-DEFAULT_MODEL_NAME = get_env_str("TOOLBOX_MODEL", "birefnet-hq", legacy=("NUKKI_MODEL",))
-BIREFNET_REPO = get_env_str(
-    "TOOLBOX_BIREFNET_REPO",
-    "ZhengPeng7/BiRefNet",
-    legacy=("NUKKI_BIREFNET_REPO",),
-)
-BIREFNET_REVISION = get_env_str(
-    "TOOLBOX_BIREFNET_REVISION",
-    DEFAULT_BIREFNET_REVISION,
-    legacy=("NUKKI_BIREFNET_REVISION",),
-)
-BIREFNET_INPUT_SIZE = get_env_int(
-    "TOOLBOX_BIREFNET_SIZE",
-    1024,
-    legacy=("NUKKI_BIREFNET_SIZE",),
-    minimum=256,
-    maximum=2048,
-)
+DEFAULT_MODEL_NAME = get_env_str("TOOLBOX_MODEL", "lucida", legacy=("NUKKI_MODEL",))
 TORCH_THREADS = get_env_int(
     "TOOLBOX_TORCH_THREADS",
     0,

@@ -3,9 +3,7 @@ import {
   formatProfiles,
   modelHelps,
   modelProfiles,
-  presetHelps,
-  presets,
-} from "./js/config.js?v=18";
+} from "./js/config.js?v=19";
 import { el, getIcoSizeInputs, getSelectedIcoSizes } from "./js/elements.js";
 import {
   buildBulkArchiveName,
@@ -13,11 +11,6 @@ import {
   buildCutoutName,
   buildCutoutWebpName,
   buildWebpArchiveName,
-  capitalize,
-  describeBackground,
-  describeErode,
-  describeFeather,
-  describeForeground,
   formatBytes,
   hasDraggedFiles,
   isSupportedForView,
@@ -61,22 +54,7 @@ const {
   resultMeta,
   modelSelect,
   modelProfile,
-  qualityMode,
   modelHelp,
-  presetHelp,
-  alphaMatting,
-  postProcess,
-  foregroundRefine,
-  edgeFeather,
-  erodeSize,
-  foregroundThreshold,
-  backgroundThreshold,
-  edgeValue,
-  thresholdValue,
-  featherHelp,
-  erodeHelp,
-  foregroundHelp,
-  backgroundHelp,
   bulkFileInput,
   bulkDropzone,
   bulkFileMeta,
@@ -89,22 +67,7 @@ const {
   floatingBulkSaveButton,
   bulkModelSelect,
   bulkModelProfile,
-  bulkQualityMode,
   bulkModelHelp,
-  bulkPresetHelp,
-  bulkAlphaMatting,
-  bulkPostProcess,
-  bulkForegroundRefine,
-  bulkEdgeFeather,
-  bulkErodeSize,
-  bulkForegroundThreshold,
-  bulkBackgroundThreshold,
-  bulkEdgeValue,
-  bulkThresholdValue,
-  bulkFeatherHelp,
-  bulkErodeHelp,
-  bulkForegroundHelp,
-  bulkBackgroundHelp,
   bulkStageTitle,
   bulkStageMeta,
   bulkResultMeta,
@@ -164,8 +127,6 @@ const {
   convertStageTitle,
   convertStageMeta,
   convertResultMeta,
-  segments,
-  bulkSegments,
 } = el;
 
 let selectedFile = null;
@@ -194,7 +155,7 @@ let activeBulkRequestId = 0;
 let webpRequestId = 0;
 let activeWebpRequestId = 0;
 let activeProgressToken = null;
-let defaultModelName = "birefnet-hq";
+let defaultModelName = "lucida";
 let modelGroups = fallbackModelGroups;
 let modelInfoById = new Map();
 const customModelSelects = new Map();
@@ -211,8 +172,6 @@ function init() {
   bindConvertEvents();
   bindCustomModelPickerEvents();
   setModelCatalog({ default: defaultModelName, groups: fallbackModelGroups }, { preserveSelection: false });
-  applyPreset("ultra");
-  applyBulkPreset("ultra");
   updateWebpControls();
   updateConvertControls();
   checkApi();
@@ -337,18 +296,10 @@ function syncFloatingActions() {
 function bindCutoutEvents() {
   bindFilePicker(fileInput, dropzone, setFile);
 
-  segments.forEach((button) => {
-    button.addEventListener("click", () => applyPreset(button.dataset.preset));
-  });
-
   modelSelect.addEventListener("change", () => {
     updateModelHelp();
     syncCustomModelSelect(modelSelect);
   });
-
-  for (const input of [edgeFeather, erodeSize, foregroundThreshold, backgroundThreshold]) {
-    input.addEventListener("input", refreshLabels);
-  }
 
   processButton.addEventListener("click", processImage);
   downloadButton.addEventListener("click", saveCutoutPng);
@@ -358,18 +309,10 @@ function bindCutoutEvents() {
 function bindBulkEvents() {
   bindBulkFilePicker();
 
-  bulkSegments.forEach((button) => {
-    button.addEventListener("click", () => applyBulkPreset(button.dataset.bulkPreset));
-  });
-
   bulkModelSelect.addEventListener("change", () => {
     updateBulkModelHelp();
     syncCustomModelSelect(bulkModelSelect);
   });
-
-  for (const input of [bulkEdgeFeather, bulkErodeSize, bulkForegroundThreshold, bulkBackgroundThreshold]) {
-    input.addEventListener("input", refreshBulkLabels);
-  }
 
   bulkProcessButton.addEventListener("click", processBulkImages);
   bulkSaveButton.addEventListener("click", saveBulkArchive);
@@ -574,14 +517,6 @@ async function processImage() {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("model_name", modelName);
-  formData.append("alpha_matting", String(alphaMatting.checked));
-  formData.append("post_process_mask", String(postProcess.checked));
-  formData.append("foreground_refine", String(foregroundRefine.checked));
-  formData.append("foreground_threshold", foregroundThreshold.value);
-  formData.append("background_threshold", backgroundThreshold.value);
-  formData.append("erode_size", erodeSize.value);
-  formData.append("edge_feather", edgeFeather.value);
-  formData.append("png_compression", "4");
 
   try {
     const response = await fetch("/api/remove", {
@@ -881,14 +816,6 @@ async function removeFile(file, options) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("model_name", options.modelName);
-  formData.append("alpha_matting", String(options.alphaMatting));
-  formData.append("post_process_mask", String(options.postProcess));
-  formData.append("foreground_refine", String(options.foregroundRefine));
-  formData.append("foreground_threshold", options.foregroundThreshold);
-  formData.append("background_threshold", options.backgroundThreshold);
-  formData.append("erode_size", options.erodeSize);
-  formData.append("edge_feather", options.edgeFeather);
-  formData.append("png_compression", "4");
 
   const response = await fetch("/api/remove", {
     method: "POST",
@@ -1681,58 +1608,9 @@ async function saveConvertedFile(event) {
   }
 }
 
-function applyPreset(name) {
-  const preset = presets[name];
-  if (!preset) return;
-
-  alphaMatting.checked = preset.alphaMatting;
-  postProcess.checked = preset.postProcess;
-  foregroundRefine.checked = preset.foregroundRefine;
-  updateModelHelp();
-  edgeFeather.value = preset.edgeFeather;
-  erodeSize.value = preset.erodeSize;
-  foregroundThreshold.value = preset.foregroundThreshold;
-  backgroundThreshold.value = preset.backgroundThreshold;
-  qualityMode.textContent = capitalize(name);
-  presetHelp.textContent = presetHelps[name] ?? "선택한 프리셋에 맞춰 모델과 보정 옵션을 조정합니다.";
-
-  segments.forEach((button) => {
-    button.classList.toggle("active", button.dataset.preset === name);
-  });
-  refreshLabels();
-}
-
-function applyBulkPreset(name) {
-  const preset = presets[name];
-  if (!preset) return;
-
-  bulkAlphaMatting.checked = preset.alphaMatting;
-  bulkPostProcess.checked = preset.postProcess;
-  bulkForegroundRefine.checked = preset.foregroundRefine;
-  updateBulkModelHelp();
-  bulkEdgeFeather.value = preset.edgeFeather;
-  bulkErodeSize.value = preset.erodeSize;
-  bulkForegroundThreshold.value = preset.foregroundThreshold;
-  bulkBackgroundThreshold.value = preset.backgroundThreshold;
-  bulkQualityMode.textContent = capitalize(name);
-  bulkPresetHelp.textContent = presetHelps[name] ?? "선택한 프리셋에 맞춰 모델과 보정 옵션을 조정합니다.";
-
-  bulkSegments.forEach((button) => {
-    button.classList.toggle("active", button.dataset.bulkPreset === name);
-  });
-  refreshBulkLabels();
-}
-
 function getBulkRemoveOptions() {
   return {
     modelName: bulkModelSelect.value,
-    alphaMatting: bulkAlphaMatting.checked,
-    postProcess: bulkPostProcess.checked,
-    foregroundRefine: bulkForegroundRefine.checked,
-    foregroundThreshold: bulkForegroundThreshold.value,
-    backgroundThreshold: bulkBackgroundThreshold.value,
-    erodeSize: bulkErodeSize.value,
-    edgeFeather: bulkEdgeFeather.value,
   };
 }
 
@@ -1796,24 +1674,6 @@ function clearConvertResult() {
   convertResultPreview.closest(".image-frame").classList.remove("has-image");
   convertDownloadButton.removeAttribute("href");
   convertDownloadButton.classList.add("disabled");
-}
-
-function refreshLabels() {
-  edgeValue.textContent = `${edgeFeather.value}px`;
-  thresholdValue.textContent = `${foregroundThreshold.value} / ${backgroundThreshold.value}`;
-  featherHelp.textContent = describeFeather(Number(edgeFeather.value));
-  erodeHelp.textContent = describeErode(Number(erodeSize.value));
-  foregroundHelp.textContent = describeForeground(Number(foregroundThreshold.value));
-  backgroundHelp.textContent = describeBackground(Number(backgroundThreshold.value));
-}
-
-function refreshBulkLabels() {
-  bulkEdgeValue.textContent = `${bulkEdgeFeather.value}px`;
-  bulkThresholdValue.textContent = `${bulkForegroundThreshold.value} / ${bulkBackgroundThreshold.value}`;
-  bulkFeatherHelp.textContent = describeFeather(Number(bulkEdgeFeather.value));
-  bulkErodeHelp.textContent = describeErode(Number(bulkErodeSize.value));
-  bulkForegroundHelp.textContent = describeForeground(Number(bulkForegroundThreshold.value));
-  bulkBackgroundHelp.textContent = describeBackground(Number(bulkBackgroundThreshold.value));
 }
 
 function updateModelHelp() {
@@ -2153,7 +2013,8 @@ function handleModelOptionKeydown(control, event) {
 
 function formatModelDescription(info, fallback) {
   if (!info) return fallback ?? "이미지 성격에 맞는 배경 제거 모델을 선택합니다.";
-  return [info.description, info.license_note].filter(Boolean).join(" ");
+  const license = info.license_id ? `라이선스: ${info.license_id}.` : "";
+  return [info.description, license].filter(Boolean).join(" ");
 }
 
 function getModelLabel(modelName) {
@@ -2162,7 +2023,7 @@ function getModelLabel(modelName) {
 }
 
 function isHeavyRemoveModel(modelName) {
-  return modelName.startsWith("birefnet") || modelName === "bria-rmbg";
+  return modelName !== "isnet-anime";
 }
 
 function buildRemoveProgressDetail(modelName) {
