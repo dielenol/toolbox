@@ -2,6 +2,7 @@
   "private": true,
   "scripts": {
     "dev": "node ./scripts/dev.mjs",
-    "start": "node ./scripts/dev.mjs"
+    "start": "node ./scripts/dev.mjs",
+    "service:install": "node ./scripts/install-launch-agent.mjs"
   }
 }

@@ -70,7 +70,7 @@ class RemoverCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             list(inspect.signature(remove_endpoint).parameters),
-            ["file", "model_name"],
+            ["file", "model_name", "task"],
         )
 
 

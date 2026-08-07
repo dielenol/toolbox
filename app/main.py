@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import base64
+import json
 import logging
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -20,6 +23,7 @@ from app.converter import (
     convert_image,
     parse_ico_sizes,
 )
+from app.cutout_quality import CutoutQualityReport, analyze_cutout
 from app.local_save import save_file_with_dialog
 from app.remover import (
     DEFAULT_MODEL,
@@ -32,8 +36,9 @@ from app.remover import (
     RemoveOptions,
     UnsupportedModelError,
     remove_background,
+    resolve_task_model,
 )
-from app.settings import MAX_UPLOAD_BYTES
+from app.settings import ALLOWED_BROWSER_ORIGINS, MAX_UPLOAD_BYTES
 
 
 logger = logging.getLogger(__name__)
@@ -41,6 +46,55 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Toolbox", version="0.1.0")
+LOOPBACK_ORIGIN_PATTERN = (
+    r"^http://(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$"
+)
+EXPOSED_RESPONSE_HEADERS = (
+    "Content-Disposition",
+    "X-Cutout-Manifest",
+    "X-Image-Width",
+    "X-Image-Height",
+    "X-Model",
+    "X-Quality-Policy",
+    "X-Process-Time-Ms",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(ALLOWED_BROWSER_ORIGINS),
+    allow_origin_regex=LOOPBACK_ORIGIN_PATTERN,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+    expose_headers=list(EXPOSED_RESPONSE_HEADERS),
+    max_age=600,
+)
+
+
+@app.middleware("http")
+async def enforce_browser_origin(request: Request, call_next):
+    origin = request.headers.get("origin")
+    is_api_write = request.url.path.startswith("/api/") and request.method in {
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+    }
+    if is_api_write and origin is not None and not _is_allowed_browser_origin(origin):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "허용되지 않은 브라우저 출처입니다."},
+        )
+
+    response = await call_next(request)
+    if (
+        origin is not None
+        and _is_allowed_browser_origin(origin)
+        and request.headers.get("access-control-request-private-network") == "true"
+    ):
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
+
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -91,17 +145,18 @@ def formats() -> dict[str, object]:
 @app.post("/api/remove")
 async def remove_endpoint(
     file: UploadFile = File(...),
-    model_name: str = Form(DEFAULT_MODEL),
+    model_name: str | None = Form(None),
+    task: str | None = Form(None),
 ) -> Response:
-    if model_name not in SUPPORTED_MODELS:
-        raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
+    selection = _resolve_remove_selection(task=task, model_name=model_name)
 
     contents = await _read_upload(file)
 
-    options = RemoveOptions(model_name=model_name)
+    options = RemoveOptions(model_name=selection["model_name"])
 
     try:
         result = await run_in_threadpool(remove_background, contents, options)
+        quality = await run_in_threadpool(analyze_cutout, contents, result.png)
     except InvalidImageError as exc:
         raise HTTPException(status_code=415, detail=str(exc)) from exc
     except ImageTooLargeError as exc:
@@ -113,6 +168,11 @@ async def remove_endpoint(
         raise HTTPException(status_code=500, detail=_model_runtime_error(options.model_name)) from exc
 
     filename = _output_filename(file.filename)
+    manifest = _cutout_manifest(
+        selection=selection,
+        quality=quality,
+        elapsed_ms=result.elapsed_ms,
+    )
     return Response(
         content=result.png,
         media_type="image/png",
@@ -123,7 +183,98 @@ async def remove_endpoint(
             "X-Model": result.model_name,
             "X-Quality-Policy": "maximum",
             "X-Process-Time-Ms": str(result.elapsed_ms),
+            "X-Cutout-Manifest": _encode_header_payload(manifest),
         },
+    )
+
+
+def _resolve_remove_selection(
+    *,
+    task: str | None,
+    model_name: str | None,
+) -> dict[str, str | None]:
+    normalized_task = task.strip().lower() if task and task.strip() else None
+    normalized_model = (
+        model_name.strip().lower() if model_name and model_name.strip() else None
+    )
+    if normalized_task and normalized_model:
+        raise HTTPException(
+            status_code=400,
+            detail="작업 유형과 모델은 동시에 지정할 수 없습니다.",
+        )
+
+    if normalized_task:
+        try:
+            model = resolve_task_model(normalized_task)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="지원하지 않는 작업 유형입니다.",
+            ) from exc
+        selection_mode = "task"
+        requested_model = None
+    else:
+        resolved_model = normalized_model or DEFAULT_MODEL
+        if resolved_model not in SUPPORTED_MODELS:
+            raise HTTPException(status_code=400, detail="지원하지 않는 모델입니다.")
+        model = MODEL_BY_ID[resolved_model]
+        selection_mode = "model" if normalized_model else "default"
+        requested_model = normalized_model
+
+    return {
+        "selection_mode": selection_mode,
+        "requested_task": normalized_task,
+        "requested_model": requested_model,
+        "model_name": model.id,
+        "model_label": model.name,
+        "fallback_model": model.fallback_model,
+        "fallback_model_label": MODEL_BY_ID[model.fallback_model].name,
+    }
+
+
+def _cutout_manifest(
+    *,
+    selection: dict[str, str | None],
+    quality: CutoutQualityReport,
+    elapsed_ms: int,
+) -> dict[str, object]:
+    return {
+        "version": 1,
+        **selection,
+        "quality_policy": "maximum",
+        "process_time_ms": elapsed_ms,
+        "quality": quality.to_payload(),
+    }
+
+
+def _encode_header_payload(payload: dict[str, object]) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(encoded).decode("ascii").rstrip("=")
+
+
+def _is_allowed_browser_origin(origin: str) -> bool:
+    if origin in ALLOWED_BROWSER_ORIGINS:
+        return True
+
+    try:
+        parsed = urlsplit(origin)
+        port = parsed.port
+    except ValueError:
+        return False
+
+    return (
+        parsed.scheme == "http"
+        and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.path in {"", "/"}
+        and parsed.query == ""
+        and parsed.fragment == ""
+        and (port is None or 1 <= port <= 65535)
     )
 
 

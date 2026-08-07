@@ -38,6 +38,16 @@ pnpm dev -- --port 8010
 
 Toolbox는 로컬 전용이므로 실행 호스트는 `127.0.0.1`, `localhost`, `::1`만 허용합니다. Windows PowerShell에서는 `scripts/dev.ps1`도 사용할 수 있습니다.
 
+### macOS 로그인 자동 실행
+
+Life OS에서 항상 연결하려면 이 Mac에서 한 번 설치합니다.
+
+```bash
+pnpm service:install
+```
+
+사용자 LaunchAgent `me.lenol.toolbox`가 `127.0.0.1:8000`에만 바인딩하고, 로그인 시 시작하며 종료되면 다시 실행합니다. 설치 명령은 같은 설정을 안전하게 갱신하므로 연결 복구가 필요할 때 다시 실행해도 됩니다. 로그는 `~/Library/Logs/Toolbox/`에 기록됩니다.
+
 ## 최초 1회 설치
 
 macOS/Linux:
@@ -219,6 +229,7 @@ CLI 규칙:
 | `TOOLBOX_TORCH_THREADS` | `0` | CPU 추론용 PyTorch 스레드 수. 0이면 기본값 사용 |
 | `TOOLBOX_MAX_PIXELS` | `80000000` | 허용할 최대 픽셀 수 |
 | `TOOLBOX_MAX_UPLOAD_BYTES` | `104857600` | 허용할 최대 업로드 파일 크기 |
+| `TOOLBOX_ALLOWED_ORIGINS` | `https://lenol.me,https://www.lenol.me` | 쉼표로 구분한 브라우저 교차 출처 허용 목록 |
 
 모델 저장소, revision, 입력 크기는 환경 변수로 낮추거나 바꿀 수 없습니다. 카탈로그에 검증된 값으로 고정됩니다.
 
@@ -248,7 +259,10 @@ Content-Type: multipart/form-data
 허용 필드:
 
 - `file`: 이미지 파일
+- `task`: `general`, `character`, `transparent`, `design`, `portrait`, `hair`, `product`, `complex`, `anime`
 - `model_name`: `lucida`, `birefnet-hr-matting`, `birefnet-hr`, `isnet-anime`
+
+`task`와 `model_name`은 동시에 지정하지 않습니다. 둘 다 생략하면 기본 모델을 사용하며, Life OS는 `task`로 권장 모델을 선택한 뒤 응답이 선언한 대체 모델을 최대 한 번 요청합니다.
 
 응답은 투명 PNG이며 다음 헤더를 포함합니다.
 
@@ -256,6 +270,9 @@ Content-Type: multipart/form-data
 - `X-Model`
 - `X-Quality-Policy: maximum`
 - `X-Process-Time-Ms`
+- `X-Cutout-Manifest`: URL-safe Base64 JSON으로 인코딩한 작업 선택, 실제 모델, 대체 모델과 알파 구조 QA 결과
+
+브라우저 호출은 `https://lenol.me`, `https://www.lenol.me`와 HTTP loopback Origin만 허용합니다. Origin이 없는 CLI·네이티브 호출은 기존처럼 사용할 수 있고, `TOOLBOX_ALLOWED_ORIGINS`로 정확한 HTTPS Origin을 추가할 수 있습니다.
 
 ### 파일 변환
 

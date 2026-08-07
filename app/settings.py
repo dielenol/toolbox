@@ -59,6 +59,15 @@ def get_env_int(
     return value
 
 
+def get_env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = os.getenv(name)
+    if raw_value in (None, ""):
+        return default
+
+    values = tuple(value.strip() for value in raw_value.split(",") if value.strip())
+    return values or default
+
+
 DEFAULT_MODEL_NAME = get_env_str("TOOLBOX_MODEL", "lucida", legacy=("NUKKI_MODEL",))
 TORCH_THREADS = get_env_int(
     "TOOLBOX_TORCH_THREADS",
@@ -78,4 +87,8 @@ MAX_UPLOAD_BYTES = get_env_int(
     100 * 1024 * 1024,
     legacy=("NUKKI_MAX_UPLOAD_BYTES",),
     minimum=1,
+)
+ALLOWED_BROWSER_ORIGINS = get_env_list(
+    "TOOLBOX_ALLOWED_ORIGINS",
+    ("https://lenol.me", "https://www.lenol.me"),
 )
